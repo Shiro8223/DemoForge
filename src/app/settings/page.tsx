@@ -1,4 +1,7 @@
+import { Suspense } from "react";
 import { Box, Info, Plug, Sparkles, TriangleAlert } from "lucide-react";
+import { GithubIcon } from "@/components/brand";
+import { GitHubSettings } from "@/components/github-account";
 import { HiggsfieldSettings } from "@/components/settings/higgsfield-settings";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -8,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 const SECTIONS = [
   { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "github", label: "GitHub", icon: GithubIcon },
   { id: "generation", label: "Generation", icon: Sparkles },
   { id: "sandbox", label: "Sandbox", icon: Box },
   { id: "danger", label: "Danger zone", icon: Info },
@@ -27,7 +31,7 @@ export default function SettingsPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 pt-10 pb-24 sm:px-6">
       <div className="mb-10">
-        <h1 className="font-display text-[32px] font-bold tracking-tight">Settings</h1>
+        <h1 className="font-display text-[44px] leading-none">Settings</h1>
         <p className="mt-2 text-[15px] text-muted">Keys stay on the server — never sent to the browser or to repository processes.</p>
       </div>
       <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -48,9 +52,13 @@ export default function SettingsPage() {
 
         <div className="max-w-[720px] space-y-6">
           <HiggsfieldSettings maxScenes={config.higgsfield.maxScenes}>
+            <Suspense>
+              <GitHubSettings />
+            </Suspense>
+
             <section id="generation" className="card-inset scroll-mt-20 rounded-2xl border border-line bg-panel/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-base font-semibold tracking-tight">Gemini</h2>
+                <h2 className="text-xl">Gemini</h2>
                 <Badge variant={gemini ? "success" : "warning"}>
                   <span className={cn("size-1.5 rounded-full", gemini ? "bg-emerald-400" : "bg-amber-400")} />
                   {gemini ? "Configured via GEMINI_API_KEY" : "Not configured"}
@@ -68,7 +76,7 @@ export default function SettingsPage() {
             </section>
 
             <section id="sandbox" className="card-inset scroll-mt-20 rounded-2xl border border-line bg-panel/80 p-5">
-              <h2 className="text-base font-semibold tracking-tight">Sandbox mode</h2>
+              <h2 className="text-xl">Sandbox mode</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">Repositories are untrusted code. This controls how installs and launches are isolated.</p>
               <div className="mt-4 inline-flex rounded-xl border border-line bg-panel p-1" role="radiogroup" aria-label="Sandbox mode (read-only)">
                 {(["local", "docker"] as const).map((m) => (

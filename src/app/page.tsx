@@ -1,6 +1,6 @@
-import { ArrowRight, Brain, Camera, Film, GitBranch, LayoutTemplate, Rocket, Sparkles } from "lucide-react";
+import { Fragment } from "react";
+import { ArrowRight, Brain, Camera, Film, GitBranch, LayoutTemplate, Rocket, Sparkles, Star } from "lucide-react";
 import { ImportForm } from "@/components/landing/import-form";
-import { SystemStatus } from "@/components/landing/system-status";
 import { RecentJobs } from "@/components/landing/recent-jobs";
 
 const STEPS = [
@@ -18,11 +18,15 @@ export default function Home() {
     <main>
       <section className="hero-glow">
         <div className="mx-auto max-w-6xl px-4 pt-20 pb-16 text-center sm:px-6">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-3 py-1.5 text-[13px] text-muted">
-            <span className="size-1.5 rounded-full bg-violet-400" />
-            Real screenshots · AI cinematics · zero editing
-          </div>
-          <h1 className="mx-auto max-w-3xl font-display text-4xl leading-[1.05] font-bold tracking-tight sm:text-[56px]">
+          <p className="mb-8 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[13px] text-muted">
+            {["Real screenshots", "AI cinematics", "zero editing"].map((t, i) => (
+              <Fragment key={t}>
+                {i > 0 && <Star aria-hidden className="size-3 fill-amber-400 text-amber-400" />}
+                {t}
+              </Fragment>
+            ))}
+          </p>
+          <h1 className="mx-auto max-w-4xl font-display text-5xl leading-[0.95] sm:text-[88px]">
             Turn any GitHub repo into a
             <br className="hidden sm:block" /> <span className="text-gradient">cinematic product demo</span>
           </h1>
@@ -33,16 +37,13 @@ export default function Home() {
           <div id="import" className="mx-auto mt-10 max-w-xl scroll-mt-24">
             <ImportForm />
           </div>
-          <div className="mt-10">
-            <SystemStatus />
-          </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
         <div className="mb-12 text-center">
           <p className="eyebrow mb-3">The pipeline</p>
-          <h2 className="font-display text-[32px] font-bold tracking-tight">How it works</h2>
+          <h2 className="font-display text-[44px] leading-none">How it works</h2>
           <p className="mx-auto mt-3 max-w-lg text-[15px] text-muted">Seven automated stages from repository to a ready-to-post vertical video.</p>
         </div>
         <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -57,12 +58,12 @@ export default function Home() {
                 </span>
                 <span className="font-mono text-xs text-muted">0{i + 1}</span>
               </div>
-              <h3 className="mb-1.5 text-[15px] font-semibold">{s.title}</h3>
+              <h3 className="mb-1.5 text-lg">{s.title}</h3>
               <p className="text-[13px] leading-relaxed text-muted">{s.body}</p>
             </li>
           ))}
           <li className="flex flex-col justify-center rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-600/15 to-indigo-600/5 p-5">
-            <h3 className="mb-1.5 text-[15px] font-semibold">Ready to forge?</h3>
+            <h3 className="mb-1.5 text-lg">Ready to forge?</h3>
             <p className="mb-4 text-[13px] leading-relaxed text-muted">
               Real screenshots for real features. AI footage only where it can&apos;t misrepresent your product.
             </p>

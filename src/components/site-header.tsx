@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
-import { GithubIcon, LogoMark, REPO_URL } from "@/components/brand";
+import { LogoMark, REPO_URL } from "@/components/brand";
+import { HeaderGitHub } from "@/components/github-account";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -41,15 +42,7 @@ export function SiteHeader() {
           })}
         </nav>
         <div className="flex items-center gap-2">
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="DemoForge on GitHub"
-            className="hidden h-8 items-center rounded-lg border border-line px-2.5 text-muted transition-colors duration-150 hover:border-line-strong hover:text-fg sm:flex"
-          >
-            <GithubIcon />
-          </a>
+          <HeaderGitHub />
           <Link
             href="/#import"
             className="flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 text-[13px] font-medium text-white shadow-[0_0_0_1px_rgb(255_255_255/0.08)_inset,0_8px_24px_-8px_rgb(139_92_246/0.6)] hover:brightness-110"

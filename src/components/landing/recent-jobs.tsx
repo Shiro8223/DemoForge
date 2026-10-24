@@ -102,7 +102,7 @@ export function RecentJobs() {
       <div className="mb-8 flex items-end justify-between gap-4">
         <div>
           <p className="eyebrow mb-3">Gallery</p>
-          <h2 className="font-display text-[32px] font-bold tracking-tight">Recent jobs</h2>
+          <h2 className="font-display text-[44px] leading-none">Recent jobs</h2>
         </div>
         <Link href="/jobs" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-violet-300 transition-colors hover:text-violet-200">
           View all <ArrowRight className="size-3.5" />
