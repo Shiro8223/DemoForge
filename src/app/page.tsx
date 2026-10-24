@@ -10,7 +10,7 @@ const STEPS = [
   { icon: Brain, title: "Understand", body: "Gemini reads the code to find the framework, routes and real features." },
   { icon: Rocket, title: "Launch", body: "Dependencies install and the app boots in a sandbox." },
   { icon: Camera, title: "Capture", body: "Playwright screenshots the actual UI, desktop and mobile." },
-  { icon: LayoutTemplate, title: "Storyboard", body: "A grounded summary and a validated 9:16 storyboard." },
+  { icon: LayoutTemplate, title: "Storyboard", body: "A grounded summary and a validated storyboard, vertical or widescreen." },
   { icon: Sparkles, title: "Generate", body: "Higgsfield renders cinematic hooks, transitions and outros." },
   { icon: Film, title: "Assemble", body: "FFmpeg cuts it all together into final-demo.mp4." },
 ];
@@ -40,7 +40,7 @@ export default function Home() {
             </span>
           </h1>
           <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed font-medium text-fg">
-            Paste a public repository and get a 20–30s vertical promo video. We clone, understand, launch, capture real screens and assemble it —
+            Paste a repository and get a promo video of up to 30 seconds, vertical or widescreen. We clone, understand, launch, capture real screens and assemble it
             automatically.
           </p>
           <div id="import" className="mx-auto mt-10 max-w-[632px] scroll-mt-24">

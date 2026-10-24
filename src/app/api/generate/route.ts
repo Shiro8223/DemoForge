@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkRepoAccess, parseGitHubUrl } from "@/lib/github";
 import { getAccount } from "@/lib/github/auth";
+import { elevenLabsConfigured } from "@/lib/tts/elevenlabs";
 import { createJob, listJobs } from "@/lib/storage/jobs";
 import { generateRequestSchema } from "@/lib/validation/schemas";
 
@@ -36,6 +37,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const job = await createJob({ repoUrl: parsed.webUrl, owner: parsed.owner, repo: parsed.repo });
+  if (body.data.settings?.voiceover && !elevenLabsConfigured())
+    return NextResponse.json({ error: "Voiceover needs ELEVENLABS_API_KEY in .env. Turn it off or add the key." }, { status: 400 });
+
+  const job = await createJob({ repoUrl: parsed.webUrl, owner: parsed.owner, repo: parsed.repo, settings: body.data.settings });
   return NextResponse.json({ jobId: job.id }, { status: 201 });
 }

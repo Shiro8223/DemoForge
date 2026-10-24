@@ -1,13 +1,12 @@
 "use client";
 
-import { pop } from "@/lib/pop";
-import { cn } from "@/lib/utils";
-
 import { useState } from "react";
 import { Image as ImageIcon, Loader2, Pencil, Sparkles, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { pop } from "@/lib/pop";
+import { cn } from "@/lib/utils";
 import type { GeneratedScene, Scene } from "@/types";
 
 const TRANSITIONS = ["fade", "cut", "slideleft", "slideup", "circleopen", "dissolve", "zoomin"] as const;
@@ -19,14 +18,20 @@ export function SceneCard(props: {
   generated?: GeneratedScene;
   editable: boolean;
   higgsfield: boolean;
+  /** Developer API connected: screenshot scenes can be (re)animated with image-to-video. */
+  higgsfieldApi?: boolean;
+  /** 16:9 storyboard: thumbnails are landscape. */
+  wide?: boolean;
   onQueued: () => void;
 }) {
-  const { jobId, scene, index, generated, editable, higgsfield, onQueued } = props;
+  const { jobId, scene, index, generated, editable, higgsfield, higgsfieldApi, wide, onQueued } = props;
+  const animatable = scene.visualType === "generated" || (scene.visualType === "screenshot" && !!higgsfieldApi);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(scene.textOverlay);
   const [duration, setDuration] = useState(String(scene.duration));
   const [transition, setTransition] = useState(scene.transition);
   const [prompt, setPrompt] = useState(scene.videoPrompt);
+  const [narration, setNarration] = useState(scene.narration ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +41,14 @@ export function SceneCard(props: {
     const res = await fetch(`/api/jobs/${jobId}/scenes/${scene.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ textOverlay: text, duration: Number(duration), transition, videoPrompt: prompt, regenerate }),
+      body: JSON.stringify({
+        textOverlay: text,
+        duration: Number(duration),
+        transition,
+        videoPrompt: prompt,
+        ...(scene.narration !== undefined ? { narration } : {}),
+        regenerate,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     setBusy(false);
@@ -49,11 +61,11 @@ export function SceneCard(props: {
   const source = (
     <Badge variant={scene.visualType === "screenshot" ? "default" : "accent"} className="text-[10px]">
       {scene.visualType === "screenshot" ? <ImageIcon /> : <Sparkles />}
-      {scene.visualType === "screenshot" ? "Screenshot" : generated ? "AI · Higgsfield" : "Title card"}
+      {scene.visualType === "screenshot" ? (generated ? "Screenshot · animated" : "Screenshot") : generated ? "AI · Higgsfield" : "Title card"}
     </Badge>
   );
   const media = (
-    <div className={cn("relative aspect-[9/16] overflow-hidden", pop(index))}>
+    <div className={cn("relative overflow-hidden", wide ? "aspect-video" : "aspect-[9/16]", pop(index))}>
       {thumb ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={thumb} alt="" className="size-full object-cover object-top" />
@@ -74,7 +86,7 @@ export function SceneCard(props: {
         <div className="flex flex-1 flex-col gap-2 p-2.5">
           <p className="truncate text-xs font-semibold" title={scene.title}>{scene.title}</p>
           <div>{source}</div>
-          <p className="line-clamp-2 text-[11px] text-fg/80" title={`${scene.purpose} — ${scene.visualDescription}`}>“{scene.textOverlay}”</p>
+          <p className="line-clamp-2 text-[11px] text-fg/80" title={`${scene.purpose}: ${scene.visualDescription}`}>“{scene.textOverlay}”</p>
           <span className="font-mono text-[10px] text-muted">{scene.transition}</span>
           {editable && (
             <button
@@ -91,13 +103,13 @@ export function SceneCard(props: {
 
   return (
     <div className="col-span-full flex gap-4 rounded-2xl border-3 border-black bg-pop-yellow/30 p-3 shadow-brutal">
-      <div className="w-24 shrink-0 overflow-hidden rounded-xl border-2 border-black">{media}</div>
+      <div className={cn("shrink-0 overflow-hidden rounded-xl border-2 border-black", wide ? "w-40" : "w-24")}>{media}</div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold">{scene.title}</p>
           {source}
         </div>
-        <p className="mt-1 text-xs text-muted">{scene.purpose} — {scene.visualDescription}</p>
+        <p className="mt-1 text-xs text-muted">{scene.purpose}: {scene.visualDescription}</p>
         <div className="mt-3 grid gap-2">
           <label className="grid gap-1 text-xs text-muted">
             On-screen text
@@ -119,18 +131,24 @@ export function SceneCard(props: {
               </select>
             </label>
           </div>
-          {scene.visualType === "generated" && (
+          {animatable && (
             <label className="grid gap-1 text-xs text-muted">
-              Video prompt
+              {scene.visualType === "screenshot" ? "Motion prompt (animates the real screenshot)" : "Video prompt"}
               <Textarea rows={3} value={prompt} maxLength={600} onChange={(e) => setPrompt(e.target.value)} />
             </label>
           )}
-          {error && <p className="text-xs text-red-300">{error}</p>}
+          {scene.narration !== undefined && (
+            <label className="grid gap-1 text-xs text-muted">
+              Voiceover line
+              <Textarea rows={2} value={narration} maxLength={300} onChange={(e) => setNarration(e.target.value)} />
+            </label>
+          )}
+          {error && <p className="text-xs font-bold text-red-700">{error}</p>}
           <div className="flex flex-wrap gap-2">
             <Button size="sm" disabled={busy} onClick={() => save(false)}>
               {busy && <Loader2 className="animate-spin" />} Save & re-render
             </Button>
-            {scene.visualType === "generated" && (
+            {animatable && (
               <Button
                 size="sm"
                 variant="secondary"

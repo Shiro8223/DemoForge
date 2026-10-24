@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseGitHubUrl } from "@/lib/github";
-import { wrapText } from "@/lib/video";
+import { sceneStarts, wrapText } from "@/lib/video";
 import { parseReadme } from "@/lib/agent/heuristics";
-import { finaliseStoryboard, templateStoryboard } from "@/lib/storyboard";
-import { storyboardSchema, type ProjectAnalysis } from "@/lib/validation/schemas";
+import { finaliseStoryboard, runtimeOf, templateStoryboard } from "@/lib/storyboard";
+import { generationSettingsSchema, maxScenesFor, storyboardSchema, type ProjectAnalysis } from "@/lib/validation/schemas";
 import { buildArgs, extractJobId, extractVideoUrl, pickTools, type ToolInfo } from "@/lib/higgsfield";
 import { resolveJobFile } from "@/lib/storage/jobs";
 
@@ -64,6 +64,54 @@ test("template storyboard validates and uses real screenshots", () => {
 test("template storyboard without screenshots is all generated", () => {
   const sb = templateStoryboard({ analysis, screenshots: [], repoUrl: "x" });
   assert.ok(sb.scenes.every((s) => s.visualType === "generated"));
+});
+
+test("generation settings clamp scene count to what the length allows", () => {
+  assert.equal(maxScenesFor(10), 3);
+  assert.equal(maxScenesFor(30), 8);
+  const s = generationSettingsSchema.parse({ duration: 10, sceneCount: 8 });
+  assert.equal(s.sceneCount, 3);
+  assert.equal(generationSettingsSchema.safeParse({ duration: 31 }).success, false);
+  assert.equal(generationSettingsSchema.safeParse({ aspectRatio: "4:3" }).success, false);
+});
+
+test("storyboards honour scene count, target length, aspect ratio and narration", () => {
+  for (const [duration, sceneCount] of [[10, 3], [18, 5], [30, 8]] as const) {
+    for (const aspectRatio of ["9:16", "16:9"] as const) {
+      const settings = generationSettingsSchema.parse({ duration, sceneCount, aspectRatio, voiceover: true });
+      const sb = templateStoryboard({ analysis, screenshots: shots, repoUrl: "x", settings });
+      assert.ok(storyboardSchema.safeParse(sb).success);
+      assert.equal(sb.scenes.length, sceneCount, `${duration}s/${sceneCount}`);
+      assert.equal(sb.aspectRatio, aspectRatio);
+      assert.ok(Math.abs(runtimeOf(sb.scenes) - duration) <= 0.2, `runtime ${runtimeOf(sb.scenes)} vs ${duration}`);
+      const want = shots.map((s) => (aspectRatio === "16:9" ? s.desktop : s.mobile));
+      for (const sc of sb.scenes.filter((x) => x.visualType === "screenshot")) assert.ok(want.includes(sc.screenshot!));
+      for (const sc of sb.scenes) assert.ok(sc.narration && sc.narration.split(" ").length <= Math.max(3, Math.floor(sc.duration * 2.5)) + 1);
+    }
+  }
+});
+
+test("finaliseStoryboard trims extra scenes but keeps the closing one", () => {
+  const sb = templateStoryboard({ analysis, screenshots: shots, repoUrl: "x", settings: generationSettingsSchema.parse({ sceneCount: 6 }) });
+  const trimmed = finaliseStoryboard(sb, shots, generationSettingsSchema.parse({ sceneCount: 3 }));
+  assert.equal(trimmed.scenes.length, 3);
+  assert.equal(trimmed.scenes[2].textOverlay, sb.scenes[sb.scenes.length - 1].textOverlay);
+});
+
+test("finaliseStoryboard hits the target length even when one scene would exceed 10s", () => {
+  const base = templateStoryboard({ analysis, screenshots: shots, repoUrl: "x", settings: generationSettingsSchema.parse({ sceneCount: 3 }) });
+  // A long middle scene (what Gemini returned in the bug report) used to squeeze the video to 24.2s instead of 25s.
+  const lopsided = { ...base, scenes: base.scenes.map((s, i) => ({ ...s, duration: i === 1 ? 10 : 2 })) };
+  for (const duration of [25, 29, 12]) {
+    const sb = finaliseStoryboard(lopsided, shots, generationSettingsSchema.parse({ sceneCount: 3, duration }));
+    assert.ok(Math.abs(runtimeOf(sb.scenes) - duration) <= 0.1, `${duration}s -> ${runtimeOf(sb.scenes)}s`);
+    assert.ok(sb.scenes.every((s) => s.duration >= 1.5 && s.duration <= 10));
+  }
+});
+
+test("sceneStarts accounts for transition overlap", () => {
+  const starts = sceneStarts([{ duration: 4, transition: "fade" }, { duration: 5, transition: "fade" }, { duration: 3, transition: "cut" }]);
+  assert.deepEqual(starts.map((x) => Math.round(x * 100) / 100), [0, 3.5, 8.46]);
 });
 
 test("finaliseStoryboard demotes scenes with unknown screenshots instead of rendering black frames", () => {

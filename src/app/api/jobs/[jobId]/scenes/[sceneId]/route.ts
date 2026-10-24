@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getJob, saveJob } from "@/lib/storage/jobs";
+import { apiConfigured } from "@/lib/higgsfield/api";
+import { runtimeOf } from "@/lib/storyboard";
 import { sceneEditSchema, storyboardSchema } from "@/lib/validation/schemas";
 
 export const runtime = "nodejs";
@@ -21,11 +23,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ jobId: string
   const body = bodySchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: body.error.issues[0]?.message ?? "Invalid edit" }, { status: 400 });
   const { regenerate, ...edit } = body.data;
-  if (regenerate && scene.visualType !== "generated")
-    return NextResponse.json({ error: "Only generated scenes can be regenerated; screenshot scenes always use the real UI." }, { status: 400 });
+  // Screenshot scenes are animated from the real UI with image-to-video, which only the developer API supports.
+  if (regenerate && scene.visualType !== "generated" && !(scene.visualType === "screenshot" && apiConfigured()))
+    return NextResponse.json({ error: "Re-animating screenshot scenes needs the Higgsfield developer API (HF_CREDENTIALS)." }, { status: 400 });
 
   Object.assign(scene, Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)));
-  sb.duration = Math.round(sb.scenes.reduce((a, s) => a + s.duration, 0) * 10) / 10;
+  sb.duration = runtimeOf(sb.scenes);
   const valid = storyboardSchema.safeParse(sb);
   if (!valid.success) return NextResponse.json({ error: valid.error.issues[0]?.message }, { status: 400 });
 
@@ -35,7 +38,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ jobId: string
   job.status = "pending";
   job.error = undefined;
   for (const s of job.stages) {
-    if (s.id === "assemble" || (regenerate && s.id === "generate")) {
+    if (s.id === "assemble" || (regenerate && s.id === "generate") || (edit.narration !== undefined && s.id === "voiceover")) {
       s.status = "pending";
       s.detail = undefined;
     }

@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, Check, ChevronRight, Clock, Download, ExternalLink, Info, Link2, Loader2, RefreshCw, Timer } from "lucide-react";
+import { AlertTriangle, AudioLines, Check, ChevronRight, Clapperboard, Clock, Download, ExternalLink, Info, Link2, Loader2, Palette, RefreshCw, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StageList } from "./stage-list";
 import { SceneCard } from "@/components/storyboard/scene-card";
 import { Markdown } from "@/components/storyboard/markdown";
+import { DEFAULT_SETTINGS } from "@/lib/validation/schemas";
 import type { Job } from "@/types";
 
 export function JobView({ jobId }: { jobId: string }) {
@@ -18,6 +19,7 @@ export function JobView({ jobId }: { jobId: string }) {
   const [missing, setMissing] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [higgsfield, setHiggsfield] = useState(false);
+  const [higgsfieldApi, setHiggsfieldApi] = useState(false);
   const [workerUp, setWorkerUp] = useState(true);
   const [regenBusy, setRegenBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -53,6 +55,7 @@ export function JobView({ jobId }: { jobId: string }) {
   useEffect(() => {
     fetch("/api/health").then((r) => r.json()).then((h) => {
       setHiggsfield(h.higgsfield);
+      setHiggsfieldApi(h.higgsfieldMode === "api");
       setWorkerUp(h.worker);
     }).catch(() => {});
   }, [active]);
@@ -100,6 +103,9 @@ export function JobView({ jobId }: { jobId: string }) {
   const a = job.outputs.analysis;
   const sb = job.outputs.storyboard;
   const shots = job.outputs.screenshots ?? [];
+  // Jobs from before options existed have no settings; they were all 9:16 with the defaults.
+  const settings = job.settings ?? DEFAULT_SETTINGS;
+  const wide = (sb?.aspectRatio ?? settings.aspectRatio) === "16:9";
   const file = (rel: string) => `/api/jobs/${job.id}/files/${rel}`;
   const v = encodeURIComponent(job.updatedAt);
   const hasVideo = !!job.outputs.video && job.stages.find((s) => s.id === "assemble")?.status === "completed";
@@ -133,6 +139,25 @@ export function JobView({ jobId }: { jobId: string }) {
               <Badge>{job.outputs.authoredBy === "gemini" ? "Storyboard by Gemini" : job.outputs.authoredBy === "claude" ? "Storyboard by Claude" : "Template storyboard"}</Badge>
             )}
           </div>
+          <div className="mb-3 flex flex-wrap gap-1.5 text-[11px] font-bold text-black">
+            {[
+              { k: "aspect", icon: null, label: settings.aspectRatio, cls: "bg-pop-pink" },
+              { k: "length", icon: Timer, label: `${settings.duration}s`, cls: "bg-pop-yellow" },
+              { k: "scenes", icon: Clapperboard, label: `${settings.sceneCount} scenes`, cls: "bg-pop-cyan" },
+              { k: "filter", icon: Palette, label: settings.filter === "none" ? "No filter" : settings.filter, cls: "bg-pop-purple capitalize" },
+              { k: "voice", icon: AudioLines, label: settings.voiceover ? "Voiceover" : "No voiceover", cls: settings.voiceover ? "bg-pop-orange" : "bg-white" },
+            ].map(({ k, icon: Icon, label, cls }) => (
+              <span key={k} className={`flex items-center gap-1 rounded-full border-2 border-black px-2 py-0.5 ${cls}`}>
+                {Icon && <Icon className="size-3" />} {label}
+              </span>
+            ))}
+          </div>
+          {settings.instructions && (
+            <p className="mb-3 max-w-2xl rounded-lg border-2 border-black bg-pop-yellow/30 px-3 py-2 text-[13px] text-black">
+              <span className="font-bold">Your instructions: </span>
+              {settings.instructions}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-4 text-[13px] text-muted">
             <span className="flex items-center gap-1.5">
               <Clock className="size-3.5" /> Started {new Date(job.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
@@ -174,7 +199,7 @@ export function JobView({ jobId }: { jobId: string }) {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
+      <div className={`grid gap-6 ${wide ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)]" : "lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]"}`}>
         {/* Left: pipeline and details */}
         <div className="min-w-0 space-y-6">
           <Card>
@@ -211,7 +236,7 @@ export function JobView({ jobId }: { jobId: string }) {
                   {sb.scenes.length} scenes · {sb.duration}s · {sb.aspectRatio} · {sb.visualStyle}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-3 pt-2 sm:grid-cols-3 xl:grid-cols-5">
+              <CardContent className={`grid gap-3 pt-2 ${wide ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3" : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5"}`}>
                 {sb.scenes.map((s, i) => (
                   <SceneCard
                     key={`${s.id}-${job.updatedAt}`}
@@ -221,6 +246,8 @@ export function JobView({ jobId }: { jobId: string }) {
                     generated={job.outputs.generatedScenes?.find((g) => g.sceneId === s.id)}
                     editable={!active}
                     higgsfield={higgsfield}
+                    higgsfieldApi={higgsfieldApi}
+                    wide={wide}
                     onQueued={load}
                   />
                 ))}
@@ -311,14 +338,14 @@ export function JobView({ jobId }: { jobId: string }) {
                 poster={job.outputs.poster ? `${file(job.outputs.poster)}?v=${v}` : undefined}
                 controls
                 playsInline
-                className="aspect-[9/16] w-full bg-black"
+                className={`${wide ? "aspect-video" : "aspect-[9/16]"} w-full bg-black`}
               />
             </div>
           ) : (
-            <div className="relative grid aspect-[9/16] place-items-center overflow-hidden rounded-3xl border-3 border-black bg-pop-purple shadow-brutal-lg">
+            <div className={`relative grid ${wide ? "aspect-video" : "aspect-[9/16]"} place-items-center overflow-hidden rounded-3xl border-3 border-black bg-pop-purple shadow-brutal-lg`}>
               {shots[0] ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={file(shots[0].mobile)} alt="" className="absolute inset-0 size-full object-cover object-top opacity-25 blur-sm" />
+                <img src={file(wide ? shots[0].desktop : shots[0].mobile)} alt="" className="absolute inset-0 size-full object-cover object-top opacity-25 blur-sm" />
               ) : null}
               <div className="relative text-center">
                 {active ? <Loader2 className="mx-auto size-9 animate-spin text-black" /> : <AlertTriangle className="mx-auto size-9 text-black" />}
@@ -331,10 +358,12 @@ export function JobView({ jobId }: { jobId: string }) {
             <CardTitle className="mb-3">Output</CardTitle>
             <dl className="space-y-2.5 text-[13px]">
               {[
-                ["Resolution", "1080×1920"],
-                ["Duration", sb ? `${sb.duration}s` : "—"],
-                ["Scenes", sb ? String(sb.scenes.length) : "—"],
-                ["Higgsfield scenes", sb ? `${job.outputs.generatedScenes?.length ?? 0} / ${aiScenes}` : "—"],
+                ["Resolution", wide ? "1920×1080" : "1080×1920"],
+                ["Duration", sb ? `${sb.duration}s` : "-"],
+                ["Scenes", sb ? String(sb.scenes.length) : "-"],
+                ["Higgsfield scenes", sb ? `${job.outputs.generatedScenes?.length ?? 0} / ${aiScenes}` : "-"],
+                ["Filter", settings.filter],
+                ["Voiceover", settings.voiceover ? `${job.outputs.voiceover?.length ?? 0} line(s)` : "off"],
               ].map(([k, val]) => (
                 <div key={k} className="flex items-center justify-between gap-3">
                   <dt className="text-muted">{k}</dt>

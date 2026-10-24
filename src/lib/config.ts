@@ -29,12 +29,23 @@ export const config = {
     clientId: process.env.GITHUB_CLIENT_ID || "",
     clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
   },
+  elevenlabs: {
+    apiKey: process.env.ELEVENLABS_API_KEY || "",
+    // "George", ElevenLabs' documented sample voice. Any voice ID from your library works.
+    voiceId: process.env.ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb",
+    model: process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2",
+  },
   higgsfield: {
     url: process.env.HIGGSFIELD_MCP_URL || "https://mcp.higgsfield.ai/mcp",
     apiKey: process.env.HIGGSFIELD_API_KEY || "",
     videoTool: process.env.HIGGSFIELD_VIDEO_TOOL || "",
     statusTool: process.env.HIGGSFIELD_STATUS_TOOL || "",
-    maxScenes: Number(process.env.HIGGSFIELD_MAX_SCENES || 2),
+    // Image-to-video model used to animate the real screenshots (developer API only).
+    i2vModel: (process.env.HIGGSFIELD_I2V_MODEL || "kling-video/v3.0/std/image-to-video").replace(/^\/+|\/+$/g, ""),
+    // Cap on Higgsfield clips per video (credits). Every scene can be animated, so the default covers the max of 8.
+    maxScenes: Number(process.env.HIGGSFIELD_MAX_SCENES || 8),
+    /** Clips requested at once; Higgsfield answers 400 when too many run in parallel. */
+    concurrency: Math.max(1, Number(process.env.HIGGSFIELD_CONCURRENCY || 3)),
   },
   limits: {
     cloneTimeoutMs: 120_000,

@@ -11,7 +11,7 @@ const anton = localFont({ src: "../../assets/fonts/Anton-Regular.ttf", variable:
 const jetbrains = localFont({ src: "../../assets/fonts/JetBrainsMono-Regular.ttf", variable: "--font-jetbrains", weight: "400" });
 
 export const metadata: Metadata = {
-  title: "DemoForge — cinematic demos from your GitHub repo",
+  title: "DemoForge: cinematic demos from your GitHub repo",
   description: "You built it. We'll make it impossible to ignore.",
 };
 

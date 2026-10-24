@@ -6,12 +6,13 @@ import { analyseHeuristically, type HeuristicResult } from "@/lib/agent/heuristi
 import { geminiAvailable, enrichAnalysis } from "@/lib/agent/gemini";
 import { installDependencies, startApp, type RunningApp } from "@/lib/sandbox";
 import { captureScreenshots, discoverFeatureRoutes } from "@/lib/browser";
-import { templateStoryboard, templateSummary, writeStory } from "@/lib/storyboard";
+import { FILTER_LOOK, templateStoryboard, templateSummary, writeStory } from "@/lib/storyboard";
 import * as higgsfield from "@/lib/higgsfield";
 import * as higgsfieldApi from "@/lib/higgsfield/api";
-import { assembleVideo, probeHasVideo } from "@/lib/video";
-import { jobDir, JobTracker } from "@/lib/storage/jobs";
-import type { GeneratedScene, Job } from "@/types";
+import { assembleVideo, assertFfmpeg, frameFor, probeHasVideo } from "@/lib/video";
+import { elevenLabsConfigured, synthesizeSpeech } from "@/lib/tts/elevenlabs";
+import { jobDir, jobSettings, JobTracker } from "@/lib/storage/jobs";
+import type { GeneratedScene, Job, Scene, Storyboard, VoiceoverClip } from "@/types";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).split("\n").slice(0, 6).join("\n").slice(0, 900);
 
@@ -48,6 +49,10 @@ async function fullPipeline(t: JobTracker, opts: RunOptions) {
   let app: RunningApp | null = null;
 
   try {
+    // 0. Preflight: no point cloning, running the app or paying for Higgsfield clips if the video can't be assembled.
+    await t.stage("clone", "running", "Checking FFmpeg");
+    await assertFfmpeg();
+
     // 1. Clone ---------------------------------------------------------------
     await t.stage("clone", "running");
     const parsed = parseGitHubUrl(job.repoUrl);
@@ -92,7 +97,10 @@ async function fullPipeline(t: JobTracker, opts: RunOptions) {
     // 9. Higgsfield ----------------------------------------------------------
     await generateScenes(t);
 
-    // 10. Assemble -----------------------------------------------------------
+    // 10. Voiceover (ElevenLabs, optional) -------------------------------------
+    await voiceoverStage(t);
+
+    // 11. Assemble -----------------------------------------------------------
     await assembleStage(t);
   } finally {
     if (app) await (app as RunningApp).stop().catch(() => {});
@@ -170,7 +178,7 @@ async function runAndCapture(
 async function writeStoryStages(t: JobTracker, shots: NonNullable<Job["outputs"]["screenshots"]>, meta: RepoMeta | null) {
   const job = t.job;
   const out = jobDir(job.id);
-  const input = { analysis: job.outputs.analysis!, screenshots: shots, repoUrl: job.repoUrl, stars: meta?.stars, topics: meta?.topics };
+  const input = { analysis: job.outputs.analysis!, screenshots: shots, repoUrl: job.repoUrl, stars: meta?.stars, topics: meta?.topics, settings: jobSettings(job) };
   await t.stage("summary", "running", geminiAvailable() ? "Gemini is writing" : "Template");
   let story;
   try {
@@ -191,43 +199,84 @@ async function writeStoryStages(t: JobTracker, shots: NonNullable<Job["outputs"]
   await t.stage("storyboard", "completed", `${story.storyboard.scenes.length} scenes · ${story.storyboard.duration}s · validated`);
 }
 
+/** Higgsfield prompt for one scene: its motion direction, the storyboard style, framing, grade and the user's instructions. */
+function clipPrompt(sb: Storyboard, scene: Scene, job: Job) {
+  const settings = jobSettings(job);
+  const look = FILTER_LOOK[settings.filter];
+  const framing = sb.aspectRatio === "16:9" ? "Widescreen 16:9" : "Vertical 9:16";
+  const parts =
+    scene.visualType === "screenshot"
+      ? [
+          scene.videoPrompt,
+          "Animate this exact screenshot of the real app with smooth, slick cinematic motion. Keep every UI element, word and layout unchanged; add no new text or logos",
+        ]
+      : [scene.videoPrompt, `Style: ${sb.visualStyle}`, `${framing}, no on-screen text`];
+  if (look) parts.push(`Look: ${look}`);
+  if (settings.instructions) parts.push(`Creative direction: ${settings.instructions.slice(0, 600)}`);
+  return parts.join(". ") + ".";
+}
+
+/** Runs `fn` over `items` with at most `limit` in flight. */
+async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
+  const queue = [...items];
+  await Promise.all(Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    for (let item = queue.shift(); item !== undefined; item = queue.shift()) await fn(item);
+  }));
+}
+
 async function generateScenes(t: JobTracker, onlySceneId?: string) {
   const job = t.job;
   const sb = job.outputs.storyboard!;
   const creds = await higgsfield.getCredentials();
+  const api = higgsfieldApi.apiConfigured();
+  // The developer API animates every scene: screenshots via image-to-video, the rest via text-to-video.
+  // The MCP fallback can only do text-to-video, so it keeps to generated scenes.
+  const animatable = (s: Scene) => s.visualType === "generated" || (api && s.visualType === "screenshot" && !!s.screenshot);
   const targets = sb.scenes
-    .filter((s) => s.visualType === "generated" && (!onlySceneId || s.id === onlySceneId))
+    .filter((s) => animatable(s) && (!onlySceneId || s.id === onlySceneId))
     .slice(0, onlySceneId ? 1 : Math.max(0, config.higgsfield.maxScenes));
 
-  if (higgsfieldApi.apiConfigured() && targets.length) {
-    // Option B: Higgsfield developer API (HF_CREDENTIALS + HIGGSFIELD_MODEL). Preferred over MCP when set.
-    await t.stage("generate", "running", `Higgsfield API (${higgsfieldApi.apiHost()})`);
+  if (api && targets.length) {
+    const skipped = sb.scenes.filter(animatable).length - targets.length;
+    await t.stage("generate", "running", `Higgsfield API: animating ${targets.length} scene(s), ${config.higgsfield.concurrency} at a time`);
+    if (skipped > 0)
+      await t.notice(`HIGGSFIELD_MAX_SCENES (${config.higgsfield.maxScenes}) left ${skipped} scene(s) unanimated. Raise it in .env to animate every scene.`);
     const clipsDir = path.join(jobDir(job.id), "scenes");
     await fs.mkdir(clipsDir, { recursive: true });
     const existing = (job.outputs.generatedScenes ?? []).filter((g) => !targets.some((s) => s.id === g.sceneId));
     const made: GeneratedScene[] = [];
     const errors: string[] = [];
-    for (const s of targets) {
+    const progress = new Map<string, string>();
+    const report = () => void t.stage("generate", "running", [...progress].map(([id, m]) => `${id}: ${m}`).join(" · "));
+    await pool(targets, config.higgsfield.concurrency, async (s) => {
       const rel = `scenes/${s.id}.mp4`;
+      const prompt = clipPrompt(sb, s, job);
       try {
         const r = await higgsfieldApi.generateClipViaApi({
-          prompt: `${s.videoPrompt}. Style: ${sb.visualStyle}. Vertical 9:16, no on-screen text.`,
+          prompt,
           duration: s.duration,
-          aspectRatio: "9:16",
+          aspectRatio: sb.aspectRatio,
+          imageFile: s.visualType === "screenshot" && s.screenshot ? path.join(jobDir(job.id), s.screenshot) : undefined,
           outFile: path.join(jobDir(job.id), rel),
-          onProgress: (m) => void t.stage("generate", "running", `${s.id}: ${m}`),
+          onProgress: (m) => {
+            progress.set(s.id, m);
+            report();
+          },
         });
         if (!(await probeHasVideo(path.join(jobDir(job.id), rel)))) throw new Error("Downloaded file is not a valid video");
-        made.push({ sceneId: s.id, file: rel, source: "higgsfield", tool: r.tool, prompt: s.videoPrompt });
+        made.push({ sceneId: s.id, file: rel, source: "higgsfield", tool: r.tool, prompt });
+        progress.set(s.id, "done");
       } catch (e) {
         errors.push(`${s.id}: ${errMsg(e)}`);
+        progress.set(s.id, "failed");
       }
-    }
-    job.outputs.generatedScenes = [...existing, ...made];
+      report();
+    });
+    job.outputs.generatedScenes = [...existing, ...made].sort((a, b) => a.sceneId.localeCompare(b.sceneId, undefined, { numeric: true }));
     await t.save();
-    if (errors.length) await t.notice(`Higgsfield generation problems — affected scenes fall back to local title cards: ${errors.join(" | ")}`);
+    if (errors.length) await t.notice(`Higgsfield generation problems. Affected scenes use local animation instead: ${errors.join(" | ")}`);
     if (!made.length) await t.stage("generate", "failed", errors[0] ?? "No scenes generated");
-    else await t.stage("generate", "completed", `${made.length} Higgsfield scene(s) via ${made[0].tool}`);
+    else await t.stage("generate", "completed", `${made.length}/${targets.length} scene(s) animated by Higgsfield`);
     return;
   }
 
@@ -257,8 +306,9 @@ async function generateScenes(t: JobTracker, onlySceneId?: string) {
         const r = await higgsfield.generateClip({
           client,
           tools,
-          prompt: `${s.videoPrompt}. Style: ${sb.visualStyle}. Vertical 9:16, no on-screen text.`,
+          prompt: clipPrompt(sb, s, job),
           duration: s.duration,
+          aspectRatio: sb.aspectRatio,
           outFile: path.join(jobDir(job.id), rel),
           onProgress: (m) => void t.stage("generate", "running", `${s.id}: ${m}`),
         });
@@ -275,15 +325,62 @@ async function generateScenes(t: JobTracker, onlySceneId?: string) {
   }
   job.outputs.generatedScenes = [...existing, ...made];
   await t.save();
-  if (errors.length) await t.notice(`Higgsfield generation problems — affected scenes fall back to local title cards: ${errors.join(" | ")}`);
+  if (errors.length) await t.notice(`Higgsfield generation problems. Affected scenes fall back to local title cards: ${errors.join(" | ")}`);
   if (!made.length) await t.stage("generate", "failed", errors[0] ?? "No scenes generated");
   else await t.stage("generate", "completed", `${made.length} Higgsfield scene(s) via ${made[0].tool}`);
+}
+
+/** Records one ElevenLabs line per scene. Reuses earlier recordings whose text hasn't changed (scene edits). */
+async function voiceoverStage(t: JobTracker) {
+  const job = t.job;
+  const sb = job.outputs.storyboard!;
+  if (!jobSettings(job).voiceover) {
+    await t.stage("voiceover", "skipped", "Voiceover was off for this video");
+    return;
+  }
+  if (!elevenLabsConfigured()) {
+    await t.stage("voiceover", "skipped", "ELEVENLABS_API_KEY is not set");
+    await t.notice("Voiceover was requested but ElevenLabs is not configured, so the video has music only.");
+    return;
+  }
+  await t.stage("voiceover", "running", "ElevenLabs");
+  const out = jobDir(job.id);
+  await fs.mkdir(path.join(out, "voiceover"), { recursive: true });
+  const previous = new Map((job.outputs.voiceover ?? []).map((v) => [v.sceneId, v]));
+  const clips: VoiceoverClip[] = [];
+  const errors: string[] = [];
+  for (const s of sb.scenes) {
+    const text = s.narration?.trim();
+    if (!text) continue;
+    const prev = previous.get(s.id);
+    const exists = prev && (await fs.access(path.join(out, prev.file)).then(() => true, () => false));
+    if (prev && prev.text === text && exists) {
+      clips.push(prev);
+      continue;
+    }
+    const rel = `voiceover/${s.id}.mp3`;
+    try {
+      await t.stage("voiceover", "running", `${s.id}: recording`);
+      await synthesizeSpeech(text, path.join(out, rel));
+      clips.push({ sceneId: s.id, file: rel, text });
+    } catch (e) {
+      errors.push(`${s.id}: ${errMsg(e)}`);
+      // The same failure (bad key, no credits) would repeat for every scene.
+      if (/API key|credits|characters/i.test(errMsg(e))) break;
+    }
+  }
+  job.outputs.voiceover = clips;
+  await t.save();
+  if (errors.length) await t.notice(`Voiceover problems. Affected scenes have music only: ${errors.join(" | ")}`);
+  if (!clips.length) await t.stage("voiceover", "failed", errors[0] ?? "No narration lines to record");
+  else await t.stage("voiceover", "completed", `${clips.length} line(s) via ElevenLabs`);
 }
 
 async function assembleStage(t: JobTracker) {
   const job = t.job;
   const out = jobDir(job.id);
   await t.stage("assemble", "running");
+  const settings = jobSettings(job);
   const clips = new Map((job.outputs.generatedScenes ?? []).map((g) => [g.sceneId, path.join(out, g.file)]));
   const { duration } = await assembleVideo({
     storyboard: job.outputs.storyboard!,
@@ -293,22 +390,29 @@ async function assembleStage(t: JobTracker) {
     output: path.join(out, "final-demo.mp4"),
     poster: path.join(out, "poster.jpg"),
     repoLabel: `github.com/${job.owner}/${job.repo}`,
+    filter: settings.filter,
+    voiceover: settings.voiceover ? (job.outputs.voiceover ?? []).map((v) => ({ sceneId: v.sceneId, file: path.join(out, v.file) })) : [],
     onProgress: (m) => t.stage("assemble", "running", m),
   });
   await fs.rm(path.join(out, "render"), { recursive: true, force: true });
   job.outputs.video = "final-demo.mp4";
   job.outputs.poster = "poster.jpg";
-  await t.stage("assemble", "completed", `final-demo.mp4 · ${duration.toFixed(1)}s · 1080×1920`);
+  const { W, H } = frameFor(job.outputs.storyboard!.aspectRatio);
+  const grade = settings.filter !== "none" ? ` · ${settings.filter} grade` : "";
+  await t.stage("assemble", "completed", `final-demo.mp4 · ${duration.toFixed(1)}s · ${W}×${H}${grade}`);
 }
 
 /** Scene edit / regenerate: optionally re-request one Higgsfield scene, then rebuild the MP4. */
 async function reassemble(t: JobTracker) {
   const job = t.job;
+  await t.stage("assemble", "running", "Checking FFmpeg");
+  await assertFfmpeg();
   await fs.writeFile(path.join(jobDir(job.id), "storyboard.json"), JSON.stringify(job.outputs.storyboard, null, 2));
   if (job.regenerateSceneId) {
     await generateScenes(t, job.regenerateSceneId);
     job.regenerateSceneId = undefined;
   }
+  if (jobSettings(job).voiceover) await voiceoverStage(t);
   await assembleStage(t);
   job.mode = "full";
 }

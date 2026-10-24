@@ -38,7 +38,7 @@ export function StageList({ stages }: { stages: StageState[] }) {
             <div className="flex items-baseline justify-between gap-3">
               <p className={cn("text-sm font-bold", s.status === "pending" && "text-muted")}>{s.label}</p>
               <span className="shrink-0 font-mono text-[11px] text-muted">
-                {s.status === "skipped" ? "skipped" : (elapsed(s, now) ?? "—")}
+                {s.status === "skipped" ? "skipped" : (elapsed(s, now) ?? "-")}
               </span>
             </div>
             {s.detail && s.status !== "running" && (

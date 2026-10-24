@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import { Readable } from "node:stream";
 import path from "node:path";
 import { getJob, resolveJobFile } from "@/lib/storage/jobs";
 
@@ -12,6 +11,49 @@ const TYPES: Record<string, string> = {
   ".md": "text/markdown; charset=utf-8",
   ".json": "application/json",
 };
+
+const CHUNK = 64 * 1024;
+
+/**
+ * Pull-based file stream for bytes [start, end]. Unlike Readable.toWeb(createReadStream()),
+ * it stops cleanly when the client disconnects (video seeks, closed tabs); the Node adapter
+ * keeps enqueueing into the closed stream and throws an uncaught ERR_INVALID_STATE that kills the server.
+ */
+function fileStream(file: string, start: number, end: number): ReadableStream<Uint8Array> {
+  let fh: fs.promises.FileHandle | null = null;
+  let pos = start;
+  let done = false;
+  const finish = async () => {
+    done = true;
+    const h = fh;
+    fh = null;
+    await h?.close().catch(() => {});
+  };
+  return new ReadableStream<Uint8Array>({
+    async start() {
+      fh = await fs.promises.open(file, "r");
+    },
+    async pull(controller) {
+      const size = Math.min(CHUNK, end - pos + 1);
+      if (done || !fh || size <= 0) {
+        await finish();
+        if (size <= 0) controller.close();
+        return;
+      }
+      const buf = new Uint8Array(size);
+      const { bytesRead } = await fh.read(buf, 0, size, pos);
+      if (done) return; // cancelled while reading
+      if (bytesRead === 0) {
+        await finish();
+        controller.close();
+        return;
+      }
+      pos += bytesRead;
+      controller.enqueue(buf.subarray(0, bytesRead));
+    },
+    cancel: finish,
+  });
+}
 
 /** Serves job outputs (video, screenshots, summary) with HTTP Range support for video seeking. */
 export async function GET(req: Request, ctx: { params: Promise<{ jobId: string; path: string[] }> }) {
@@ -48,9 +90,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ jobId: string; 
     if (start > end) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${stat.size}` } });
     headers.set("Content-Range", `bytes ${start}-${end}/${stat.size}`);
     headers.set("Content-Length", String(end - start + 1));
-    const stream = Readable.toWeb(fs.createReadStream(file, { start, end })) as ReadableStream;
-    return new Response(stream, { status: 206, headers });
+    return new Response(fileStream(file, start, end), { status: 206, headers });
   }
   headers.set("Content-Length", String(stat.size));
-  return new Response(Readable.toWeb(fs.createReadStream(file)) as ReadableStream, { status: 200, headers });
+  return new Response(fileStream(file, 0, stat.size - 1), { status: 200, headers });
 }

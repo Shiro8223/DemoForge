@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { GithubIcon } from "@/components/brand";
 import { SIGN_IN_URL, useGitHubStatus } from "@/components/github-account";
+import { GenerationOptions, type HiggsfieldInfo } from "@/components/landing/generation-options";
 import { RepoPicker } from "@/components/landing/repo-picker";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_SETTINGS, type GenerationSettings } from "@/lib/validation/schemas";
 
 const EXAMPLE = "https://github.com/vercel/nextjs-portfolio-starter";
 
@@ -17,6 +19,22 @@ export function ImportForm() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const account = useGitHubStatus().status?.account;
+  const [settings, setSettings] = useState<GenerationSettings>(DEFAULT_SETTINGS);
+  const [voiceAvailable, setVoiceAvailable] = useState(false);
+  const [higgsfield, setHiggsfield] = useState<HiggsfieldInfo | null>(null);
+  const chosen = !!url.trim();
+
+  // Only ask once options are on screen; the voiceover toggle depends on ElevenLabs being configured.
+  useEffect(() => {
+    if (!chosen) return;
+    fetch("/api/health", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((h) => {
+        setVoiceAvailable(!!h.elevenlabs);
+        setHiggsfield({ mode: h.higgsfieldMode ?? "off", maxScenes: h.higgsfieldMaxScenes ?? 0 });
+      })
+      .catch(() => {});
+  }, [chosen]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +45,7 @@ export function ImportForm() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoUrl: url }),
+        body: JSON.stringify({ repoUrl: url, settings: { ...settings, voiceover: settings.voiceover && voiceAvailable } }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -88,6 +106,16 @@ export function ImportForm() {
           </p>
         )}
       </div>
+      {chosen && (
+        <>
+          <GenerationOptions value={settings} onChange={setSettings} voiceAvailable={voiceAvailable} higgsfield={higgsfield} />
+          <Button type="submit" size="lg" disabled={busy} className="mt-5 w-full text-base">
+            {busy ? <Loader2 className="animate-spin" /> : null}
+            Generate {settings.duration}s {settings.aspectRatio} demo
+            {!busy && <ArrowRight />}
+          </Button>
+        </>
+      )}
     </form>
   );
 }

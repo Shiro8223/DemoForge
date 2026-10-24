@@ -7,6 +7,11 @@ import { randomUUID } from "node:crypto";
  *   Auth:    Authorization: Key KEY_ID:KEY_SECRET      (create the key pair at console.higgsfield.ai)
  *   Submit:  POST {base}/{model}  { prompt, duration, aspect_ratio }  → { request_id, status, ... }
  *   Poll:    GET  {base}/requests/{request_id}/status  until completed | failed | nsfw | canceled
+ *   Upload:  POST {base}/files/generate-upload-url { content_type } → { public_url, upload_url, upload_headers },
+ *            then PUT the bytes to upload_url (presigned storage; never send our credentials there).
+ *
+ * Screenshots are animated with an IMAGE-to-video model (HIGGSFIELD_I2V_MODEL, default Kling 3.0 Standard
+ * "kling-video/v3.0/std/image-to-video"): the uploaded real UI is the first frame.
  *
  * The model is part of the URL path. Copy the exact path for a TEXT-to-video model from the
  * Models Gallery into HIGGSFIELD_MODEL. Default: Kling 3.0 Standard text-to-video
@@ -18,7 +23,33 @@ const env = () => ({
   credentials: (process.env.HF_CREDENTIALS || "").trim(),
   base: (process.env.HIGGSFIELD_API_BASE || "https://api.higgsfield.ai").replace(/\/+$/, ""),
   model: (process.env.HIGGSFIELD_MODEL || "kling-video/v3.0/std/text-to-video").replace(/^\/+|\/+$/g, ""),
+  i2vModel: (process.env.HIGGSFIELD_I2V_MODEL || "kling-video/v3.0/std/image-to-video").replace(/^\/+|\/+$/g, ""),
 });
+
+const IMAGE_TYPES: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
+
+/** Uploads a local image to Higgsfield storage and returns its public URL (for image_url). */
+export async function uploadImage(file: string): Promise<string> {
+  const { base } = env();
+  const contentType = IMAGE_TYPES[file.slice(file.lastIndexOf(".")).toLowerCase()];
+  if (!contentType) throw new Error(`Unsupported image type for Higgsfield upload: ${file}`);
+  const res = await fetch(`${base}/files/generate-upload-url`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ content_type: contentType }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const j = await readJson(res);
+  if (!res.ok || typeof j.upload_url !== "string" || typeof j.public_url !== "string") throw new Error(`Higgsfield upload URL failed: ${explain(res.status, j)}`);
+  const put = await fetch(j.upload_url, {
+    method: "PUT",
+    headers: (j.upload_headers as Record<string, string>) ?? { "Content-Type": contentType },
+    body: await fs.readFile(file),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!put.ok) throw new Error(`Uploading ${file} to Higgsfield storage failed (${put.status}).`);
+  return j.public_url;
+}
 
 export function apiConfigured(): boolean {
   return /^[^:\s]+:[^:\s]+$/.test(env().credentials);
@@ -83,28 +114,46 @@ export async function generateClipViaApi(opts: {
   prompt: string;
   duration: number;
   aspectRatio?: string;
+  /** Animate this local image (image-to-video, first frame) instead of generating from text. */
+  imageFile?: string;
   outFile: string;
   onProgress?: (msg: string) => void;
   pollIntervalMs?: number;
   timeoutMs?: number;
 }): Promise<{ tool: string; url: string }> {
-  const { base, model } = env();
+  const { base } = env();
   if (!apiConfigured()) throw new Error("Higgsfield API is not configured (HF_CREDENTIALS and HIGGSFIELD_MODEL).");
+  const model = opts.imageFile ? env().i2vModel : env().model;
 
-  opts.onProgress?.(`submitting to ${model}`);
-  const submit = await fetch(`${base}/${model}`, {
-    method: "POST",
-    // Same key on retry = Higgsfield won't charge twice for the same scene.
-    headers: headers({ "Idempotency-Key": randomUUID() }),
-    body: JSON.stringify({
-      prompt: opts.prompt,
-      // Text-to-video models have a minimum length (Kling 3 s, Seedance 4 s); assembly trims to the scene.
-      duration: Math.min(15, Math.max(4, Math.round(opts.duration))),
-      aspect_ratio: opts.aspectRatio ?? "9:16",
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-  const first = await readJson(submit);
+  // Kling needs at least 3-4 s; assembly trims each clip to its scene, so round up generously.
+  const duration = Math.min(15, Math.max(4, Math.ceil(opts.duration)));
+  let body: Record<string, unknown>;
+  if (opts.imageFile) {
+    opts.onProgress?.("uploading screenshot");
+    // Frame shape comes from the image itself; our soundtrack replaces native audio, so skip it.
+    body = { prompt: opts.prompt, image_url: await uploadImage(opts.imageFile), duration, sound: "off" };
+  } else {
+    body = { prompt: opts.prompt, duration, aspect_ratio: opts.aspectRatio ?? "9:16" };
+  }
+
+  // Same key on retry = Higgsfield won't charge twice for the same scene.
+  const idempotencyKey = randomUUID();
+  let submit: Response;
+  let first: Record<string, unknown>;
+  for (let attempt = 0; ; attempt++) {
+    opts.onProgress?.(`submitting to ${model}${attempt ? ` (retry ${attempt})` : ""}`);
+    submit = await fetch(`${base}/${model}`, {
+      method: "POST",
+      headers: headers({ "Idempotency-Key": idempotencyKey }),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60_000),
+    });
+    first = await readJson(submit);
+    // Too many parallel requests comes back as 429, or 400 mentioning concurrency: back off and retry.
+    const busy = submit.status === 429 || (submit.status === 400 && /concurren|too many|in progress|rate/i.test(JSON.stringify(first)));
+    if (!busy || attempt >= 5) break;
+    await new Promise((r) => setTimeout(r, 15_000 * (attempt + 1)));
+  }
   if (!submit.ok) throw new Error(explain(submit.status, first));
 
   let url = findVideoUrl(first);

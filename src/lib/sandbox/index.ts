@@ -245,18 +245,22 @@ export async function startApp(opts: {
       stdin: "ignore",
     });
     stop = async () => {
-      if (child.pid) {
-        try {
-          process.kill(-child.pid, "SIGTERM");
-        } catch {
-          /* already gone */
-        }
-        await new Promise((r) => setTimeout(r, 1500));
-        try {
-          process.kill(-child.pid, "SIGKILL");
-        } catch {
-          /* already gone */
-        }
+      if (!child.pid) return;
+      // Negative-PID group kills don't exist on Windows (process.kill throws and the app keeps running), so kill the tree.
+      if (process.platform === "win32") {
+        await execa("taskkill", ["/pid", String(child.pid), "/T", "/F"], { reject: false });
+        return;
+      }
+      try {
+        process.kill(-child.pid, "SIGTERM");
+      } catch {
+        /* already gone */
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch {
+        /* already gone */
       }
     };
   }

@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { customAlphabet } from "nanoid";
 import { config } from "@/lib/config";
-import { STAGES, type Job, type StageId, type StageState, type StageStatus } from "@/types";
+import { STAGES, type GenerationSettings, type Job, type StageId, type StageState, type StageStatus } from "@/types";
+import { DEFAULT_SETTINGS } from "@/lib/validation/schemas";
 
 // Lowercase alphanumerics only: safe in paths, URLs and docker container names.
 const makeId = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 12);
@@ -21,7 +22,10 @@ export function freshStages(): StageState[] {
   return STAGES.map((s) => ({ id: s.id, label: s.label, status: "pending" as StageStatus }));
 }
 
-export async function createJob(input: { repoUrl: string; owner: string; repo: string }): Promise<Job> {
+/** A job's generation options, falling back to the defaults for jobs created before options existed. */
+export const jobSettings = (job: Job): GenerationSettings => job.settings ?? DEFAULT_SETTINGS;
+
+export async function createJob(input: { repoUrl: string; owner: string; repo: string; settings?: GenerationSettings }): Promise<Job> {
   const now = new Date().toISOString();
   const job: Job = {
     id: makeId(),
@@ -34,6 +38,7 @@ export async function createJob(input: { repoUrl: string; owner: string; repo: s
     notices: [],
     outputs: {},
     mode: "full",
+    settings: input.settings ?? DEFAULT_SETTINGS,
     createdAt: now,
     updatedAt: now,
   };
@@ -51,12 +56,25 @@ export async function getJob(id: string): Promise<Job | null> {
   }
 }
 
+let saveSeq = 0;
+
 /** Atomic write so the UI never reads a half-written file while polling. */
 export async function saveJob(job: Job): Promise<void> {
   job.updatedAt = new Date().toISOString();
-  const tmp = `${jobFile(job.id)}.${process.pid}.tmp`;
+  // Unique per save: parallel scene generation saves progress concurrently from one process.
+  const tmp = `${jobFile(job.id)}.${process.pid}.${++saveSeq}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(job, null, 2));
-  await fs.rename(tmp, jobFile(job.id));
+  // Windows refuses to replace a file another process (the polling web server) has open; retry briefly.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fs.rename(tmp, jobFile(job.id));
+      return;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (attempt >= 8 || (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES")) throw e;
+      await new Promise((r) => setTimeout(r, 25 * (attempt + 1)));
+    }
+  }
 }
 
 export async function listJobs(limit = 20): Promise<Job[]> {

@@ -222,11 +222,12 @@ export async function generateClip(opts: {
   onProgress?: (msg: string) => void;
   pollIntervalMs?: number;
   timeoutMs?: number;
+  aspectRatio?: string;
 }): Promise<{ tool: string; url: string }> {
   const { client, tools, prompt, duration, outFile, onProgress } = opts;
   const { video, status } = pickTools(tools);
   if (!video) throw new Error(`No video-generation tool found on the Higgsfield MCP server (tools: ${tools.map((t) => t.name).join(", ") || "none"}).`);
-  const args = buildArgs(video, { prompt, duration, aspectRatio: "9:16" });
+  const args = buildArgs(video, { prompt, duration, aspectRatio: opts.aspectRatio ?? "9:16" });
 
   onProgress?.(`calling ${video.name}`);
   const first = (await client.callTool({ name: video.name, arguments: args }, undefined, { timeout: 10 * 60_000 })) as ToolResult;

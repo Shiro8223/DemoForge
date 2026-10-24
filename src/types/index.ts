@@ -1,6 +1,6 @@
-import type { ProjectAnalysis, Storyboard } from "@/lib/validation/schemas";
+import type { GenerationSettings, ProjectAnalysis, Storyboard } from "@/lib/validation/schemas";
 
-export type { ProjectAnalysis, Storyboard, Scene } from "@/lib/validation/schemas";
+export type { AspectRatio, GenerationSettings, ProjectAnalysis, Storyboard, Scene, VideoFilter } from "@/lib/validation/schemas";
 
 export const STAGES = [
   { id: "clone", label: "Clone repository" },
@@ -12,6 +12,7 @@ export const STAGES = [
   { id: "summary", label: "Write summary" },
   { id: "storyboard", label: "Build storyboard" },
   { id: "generate", label: "Generate cinematic scenes" },
+  { id: "voiceover", label: "Record voiceover" },
   { id: "assemble", label: "Assemble video" },
 ] as const;
 
@@ -47,12 +48,20 @@ export interface GeneratedScene {
   prompt: string;
 }
 
+export interface VoiceoverClip {
+  sceneId: string;
+  /** Relative path of the ElevenLabs MP3. */
+  file: string;
+  text: string;
+}
+
 export interface JobOutputs {
   analysis?: ProjectAnalysis;
   screenshots?: Screenshot[];
   summary?: string; // relative path to summary.md
   storyboard?: Storyboard;
   generatedScenes?: GeneratedScene[];
+  voiceover?: VoiceoverClip[];
   video?: string; // relative path to final-demo.mp4
   poster?: string;
   /** Who produced the summary/storyboard: Gemini (or Claude, for older jobs) or the deterministic fallback. */
@@ -73,6 +82,8 @@ export interface Job {
   /** Non-fatal limitations the user should know about (missing keys, skipped routes...). */
   notices: string[];
   outputs: JobOutputs;
+  /** Options chosen before generation. Missing on jobs created before options existed (defaults apply). */
+  settings?: GenerationSettings;
   /** When set, the worker only re-runs assembly (scene edit) instead of the full pipeline. */
   mode: "full" | "reassemble";
   /** In reassemble mode: re-request this scene from Higgsfield before assembling. */

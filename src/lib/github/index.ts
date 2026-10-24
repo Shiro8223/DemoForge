@@ -136,12 +136,13 @@ export async function cloneRepository(parsed: ParsedRepo, workspace: string): Pr
       GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}`,
     });
   }
-  // simple-git blocks custom env vars and core.hooksPath by default; both are ours and
-  // only tighten git (hooksPath is set to disable hooks, see below).
+  // simple-git blocks custom env vars, core.hooksPath and GIT_CONFIG_COUNT by default. All are
+  // ours: hooksPath disables hooks (see below) and the env config only carries the fixed
+  // http.extraheader auth entry above, which simple-git still screens for unsafe keys.
   const git = simpleGit({
     timeout: { block: config.limits.cloneTimeoutMs },
     allowEnvironment: Object.keys(env),
-    unsafe: { allowUnsafeHooksPath: true },
+    unsafe: { allowUnsafeHooksPath: true, allowUnsafeConfigEnvCount: !!token },
   }).env(env);
   // core.symlinks=false: symlinks are checked out as plain files, so nothing we
   // later read for analysis can point outside the workspace.

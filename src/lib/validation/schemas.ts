@@ -6,7 +6,35 @@ export const repoUrlSchema = z
   .min(1, "Paste a GitHub repository URL")
   .max(300);
 
-export const generateRequestSchema = z.object({ repoUrl: repoUrlSchema });
+export const ASPECT_RATIOS = ["9:16", "16:9"] as const;
+export type AspectRatio = (typeof ASPECT_RATIOS)[number];
+
+/** Colour grades applied to the final cut (and hinted to Higgsfield so AI footage matches). */
+export const FILTERS = ["none", "cinematic", "noir", "vintage", "vivid", "warm", "cool"] as const;
+export type VideoFilter = (typeof FILTERS)[number];
+
+export const LIMITS = { minDuration: 10, maxDuration: 30, minScenes: 3, maxScenes: 8, minSecondsPerScene: 3 } as const;
+
+/** Most scenes that fit a length while keeping each one readable. */
+export const maxScenesFor = (duration: number) =>
+  Math.max(LIMITS.minScenes, Math.min(LIMITS.maxScenes, Math.floor(duration / LIMITS.minSecondsPerScene)));
+
+/** Options picked on the home page before a generation starts. */
+export const generationSettingsSchema = z
+  .object({
+    aspectRatio: z.enum(ASPECT_RATIOS).default("9:16"),
+    duration: z.number().int().min(LIMITS.minDuration).max(LIMITS.maxDuration).default(25),
+    sceneCount: z.number().int().min(LIMITS.minScenes).max(LIMITS.maxScenes).default(6),
+    filter: z.enum(FILTERS).default("none"),
+    voiceover: z.boolean().default(false),
+    /** Optional creative direction from the user, passed to Gemini and every Higgsfield prompt. */
+    instructions: z.string().trim().max(1000).default(""),
+  })
+  .transform((s) => ({ ...s, sceneCount: Math.min(s.sceneCount, maxScenesFor(s.duration)) }));
+export type GenerationSettings = z.infer<typeof generationSettingsSchema>;
+export const DEFAULT_SETTINGS: GenerationSettings = generationSettingsSchema.parse({});
+
+export const generateRequestSchema = z.object({ repoUrl: repoUrlSchema, settings: generationSettingsSchema.optional() });
 
 export const projectAnalysisSchema = z.object({
   name: z.string(),
@@ -44,6 +72,8 @@ export const sceneSchema = z.object({
   textOverlay: z.string().max(80),
   transition: z.enum(TRANSITIONS),
   audioDirection: z.string(),
+  /** Spoken voiceover line (ElevenLabs). Optional so storyboards from older jobs still load. */
+  narration: z.string().max(300).optional(),
 });
 export type Scene = z.infer<typeof sceneSchema>;
 
@@ -51,7 +81,7 @@ export const storyboardSchema = z
   .object({
     project: z.string(),
     duration: z.number(),
-    aspectRatio: z.literal("9:16"),
+    aspectRatio: z.enum(ASPECT_RATIOS),
     visualStyle: z.string(),
     musicDirection: z.string(),
     scenes: z.array(sceneSchema).min(2).max(10),
@@ -73,6 +103,7 @@ export const sceneEditSchema = z.object({
   duration: z.number().min(1.5).max(10).optional(),
   transition: z.enum(TRANSITIONS).optional(),
   videoPrompt: z.string().trim().max(600).optional(),
+  narration: z.string().trim().max(300).optional(),
 });
 
 export const higgsfieldSettingsSchema = z.object({

@@ -1,11 +1,12 @@
 import { Suspense } from "react";
-import { Box, Info, Plug, Sparkles, TriangleAlert } from "lucide-react";
+import { AudioLines, Box, Info, Plug, Sparkles, TriangleAlert } from "lucide-react";
 import { GithubIcon } from "@/components/brand";
 import { GitHubSettings } from "@/components/github-account";
 import { HiggsfieldSettings } from "@/components/settings/higgsfield-settings";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { config } from "@/lib/config";
+import { elevenLabsConfigured } from "@/lib/tts/elevenlabs";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ const SECTIONS = [
   { id: "integrations", label: "Integrations", icon: Plug },
   { id: "github", label: "GitHub", icon: GithubIcon },
   { id: "generation", label: "Generation", icon: Sparkles },
+  { id: "voiceover", label: "Voiceover", icon: AudioLines },
   { id: "sandbox", label: "Sandbox", icon: Box },
   { id: "danger", label: "Danger zone", icon: Info },
 ];
@@ -28,11 +30,12 @@ function Field({ label, value }: { label: string; value: string }) {
 
 export default function SettingsPage() {
   const gemini = !!config.gemini.apiKey;
+  const voice = elevenLabsConfigured();
   return (
     <main className="mx-auto max-w-5xl px-4 pt-10 pb-24 sm:px-6">
       <div className="mb-10">
         <h1 className="font-display text-[44px] leading-none">Settings</h1>
-        <p className="mt-2 text-[15px] text-muted">Keys stay on the server — never sent to the browser or to repository processes.</p>
+        <p className="mt-2 text-[15px] text-muted">Keys stay on the server. They are never sent to the browser or to repository processes.</p>
       </div>
       <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav className="flex flex-wrap gap-1 text-sm lg:sticky lg:top-20 lg:flex-col lg:self-start">
@@ -72,6 +75,36 @@ export default function SettingsPage() {
               <p className="mt-4 text-[13px] leading-relaxed text-muted">
                 Set <code className="font-mono text-fg">GEMINI_API_KEY</code> in <code className="font-mono text-fg">.env</code> on the server. Without
                 it, DemoForge uses deterministic templates built from static analysis, and the output is labelled as a template storyboard.
+              </p>
+            </section>
+
+            <section id="voiceover" className="scroll-mt-20 rounded-2xl border-3 border-black bg-white p-5 shadow-brutal">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-11 rotate-3 place-items-center rounded-xl border-3 border-black bg-pop-orange text-black">
+                    <AudioLines className="size-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-xl">ElevenLabs</h2>
+                    <p className="mt-0.5 text-[13px] text-muted">Voiceover narration</p>
+                  </div>
+                </div>
+                <Badge variant={voice ? "success" : "warning"}>
+                  <span className="size-1.5 rounded-full bg-black" />
+                  {voice ? "Configured via ELEVENLABS_API_KEY" : "Not configured"}
+                </Badge>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-muted">
+                Turn on <span className="font-bold text-fg">Voiceover</span> on the home page and every scene gets a spoken line, timed to the scene and
+                mixed over the music.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Field label="Voice ID" value={config.elevenlabs.voiceId} />
+                <Field label="Model" value={config.elevenlabs.model} />
+              </div>
+              <p className="mt-4 text-[13px] leading-relaxed text-muted">
+                Set <code className="font-mono text-fg">ELEVENLABS_API_KEY</code> in <code className="font-mono text-fg">.env</code> and restart. Optionally
+                pick a voice with <code className="font-mono text-fg">ELEVENLABS_VOICE_ID</code>.
               </p>
             </section>
 
