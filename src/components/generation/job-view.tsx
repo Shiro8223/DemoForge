@@ -296,7 +296,7 @@ export function JobView({ jobId }: { jobId: string }) {
           {job.outputs.narration && (
             <Card>
               <CardHeader className="flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2"><Mic className="size-4 text-violet-300" /> Voiceover</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-black"><Mic className="size-4" /> Voiceover</CardTitle>
                 <span className="text-xs text-muted">
                   ElevenLabs · {job.outputs.narration.authoredBy === "gemini" ? "script by Gemini" : "script from on-screen text"}
                 </span>
