@@ -21,6 +21,8 @@ npm run dev:all               # web on :3000 + generation worker
 
 Open http://localhost:3000, paste a repo URL and press **Generate Demo**. The worker can also run on its own (`npm run dev` + `npm run worker`).
 
+On Windows, `npm run service:install` builds the app and registers a background service (a per-user Scheduled Task, started at logon) running the production web server and worker (`npm run start:all`), logging to `outputs/service.log`. Manage it with `powershell -File scripts/service.ps1 status|stop|start|restart`; remove it with `npm run service:uninstall`. Re-run `service:install` after pulling changes so it rebuilds.
+
 To run one generation without the web UI:
 
 ```bash
