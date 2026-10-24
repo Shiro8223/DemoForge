@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Globe, Loader2 } from "lucide-react";
 import { GithubIcon } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 
@@ -11,6 +11,7 @@ const EXAMPLE = "https://github.com/vercel/nextjs-portfolio-starter";
 export function ImportForm() {
   const router = useRouter();
   const [url, setUrl] = useState("");
+  const [liveUrl, setLiveUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -22,7 +23,7 @@ export function ImportForm() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoUrl: url }),
+        body: JSON.stringify({ repoUrl: url, ...(liveUrl.trim() ? { liveUrl } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Something went wrong");
@@ -54,12 +55,25 @@ export function ImportForm() {
           {!busy && <ArrowRight />}
         </Button>
       </div>
+      <label className="mt-2 flex h-11 min-w-0 items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 transition duration-150 focus-within:border-violet-500/50 focus-within:ring-2 focus-within:ring-violet-500/30">
+        <Globe className="size-4 shrink-0 text-muted" aria-hidden />
+        <span className="sr-only">Live site URL (optional)</span>
+        <input
+          value={liveUrl}
+          onChange={(e) => setLiveUrl(e.target.value)}
+          placeholder="Live site URL (optional, e.g. your-app.vercel.app)"
+          spellCheck={false}
+          autoComplete="off"
+          inputMode="url"
+          className="w-full min-w-0 bg-transparent font-mono text-sm text-fg placeholder:text-muted/70 focus:outline-none"
+        />
+      </label>
       <div className="mt-3 flex min-h-5 flex-wrap items-center justify-center gap-2 px-1 text-xs">
         {error ? (
           <p role="alert" className="text-red-300">{error}</p>
         ) : (
           <p className="text-muted">
-            Public repos · Next.js, Vite, Node and static sites work best ·{" "}
+            Already deployed? Add the live URL and we&apos;ll film that instead of running your code ·{" "}
             <button type="button" onClick={() => setUrl(EXAMPLE)} className="text-violet-300 underline-offset-4 hover:underline">
               Try an example
             </button>

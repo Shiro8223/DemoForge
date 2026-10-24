@@ -66,6 +66,8 @@ export interface Job {
   repoUrl: string;
   owner: string;
   repo: string;
+  /** Live-URL mode: screenshot this running site instead of installing/starting the repo. */
+  liveUrl?: string;
   status: JobStatus;
   currentStage?: StageId;
   stages: StageState[];

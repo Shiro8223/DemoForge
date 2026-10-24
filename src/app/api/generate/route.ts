@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { parseGitHubUrl } from "@/lib/github";
 import { createJob, listJobs } from "@/lib/storage/jobs";
 import { generateRequestSchema } from "@/lib/validation/schemas";
+import { assertPublicLiveUrl, parseLiveUrl } from "@/lib/validation/live-url";
 
 export const runtime = "nodejs";
 
@@ -18,10 +19,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });
   }
 
+  let liveUrl: string | undefined;
+  if (body.data.liveUrl) {
+    try {
+      const live = parseLiveUrl(body.data.liveUrl);
+      await assertPublicLiveUrl(live);
+      liveUrl = live.url;
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    }
+  }
+
   const active = (await listJobs(100)).filter((j) => j.status === "pending" || j.status === "running");
   if (active.length >= MAX_QUEUED)
     return NextResponse.json({ error: "The generation queue is full. Try again in a few minutes." }, { status: 429 });
 
-  const job = await createJob({ repoUrl: parsed.webUrl, owner: parsed.owner, repo: parsed.repo });
+  const job = await createJob({ repoUrl: parsed.webUrl, owner: parsed.owner, repo: parsed.repo, liveUrl });
   return NextResponse.json({ jobId: job.id }, { status: 201 });
 }

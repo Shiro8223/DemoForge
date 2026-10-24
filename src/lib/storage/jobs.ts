@@ -21,7 +21,7 @@ export function freshStages(): StageState[] {
   return STAGES.map((s) => ({ id: s.id, label: s.label, status: "pending" as StageStatus }));
 }
 
-export async function createJob(input: { repoUrl: string; owner: string; repo: string }): Promise<Job> {
+export async function createJob(input: { repoUrl: string; owner: string; repo: string; liveUrl?: string }): Promise<Job> {
   const now = new Date().toISOString();
   const job: Job = {
     id: makeId(),
@@ -29,6 +29,7 @@ export async function createJob(input: { repoUrl: string; owner: string; repo: s
     repoUrl: input.repoUrl,
     owner: input.owner,
     repo: input.repo,
+    ...(input.liveUrl ? { liveUrl: input.liveUrl } : {}),
     status: "pending",
     stages: freshStages(),
     notices: [],

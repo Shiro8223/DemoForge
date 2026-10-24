@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, Check, ChevronRight, Clock, Download, ExternalLink, Info, Link2, Loader2, RefreshCw, Timer } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, Clock, Download, ExternalLink, Globe, Info, Link2, Loader2, RefreshCw, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -146,6 +146,11 @@ export function JobView({ jobId }: { jobId: string }) {
           <Button asChild variant="secondary">
             <a href={job.repoUrl} target="_blank" rel="noreferrer"><ExternalLink /> Open repo</a>
           </Button>
+          {job.liveUrl && (
+            <Button asChild variant="secondary">
+              <a href={job.liveUrl} target="_blank" rel="noreferrer"><Globe /> Live site</a>
+            </Button>
+          )}
           <Button variant="secondary" onClick={regenerate} disabled={active || regenBusy}>
             {regenBusy ? <Loader2 className="animate-spin" /> : <RefreshCw />} Regenerate
           </Button>
