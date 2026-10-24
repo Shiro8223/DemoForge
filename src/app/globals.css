@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #08090d;
+  --color-panel: #0f1117;
+  --color-panel-2: #151823;
+  --color-line: #1f2330;
+  --color-muted: #8b90a5;
+  --color-fg: #e8eaf2;
+  --color-accent: #8b5cf6;
+  --color-accent-2: #22d3ee;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter-display), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 30%, transparent 75%);
+}
+
+.glow {
+  background:
+    radial-gradient(600px 300px at 30% 0%, rgb(139 92 246 / 0.22), transparent 70%),
+    radial-gradient(500px 260px at 75% 10%, rgb(34 211 238 / 0.14), transparent 70%);
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, #c4b5fd, #67e8f9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgb(139 92 246 / 0.25), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+}

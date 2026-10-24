@@ -1,2 +1,124 @@
 # DemoForge
-shiny video
+
+**You built it. We'll make it impossible to ignore.**
+
+DemoForge turns a public GitHub repository into a 20–30 second vertical (9:16) promo video. It launches the app, films the **real UI**, writes a grounded summary and storyboard, generates cinematic scenes with Higgsfield, and cuts the result together with FFmpeg.
+
+```
+GitHub URL → clone → analyse (Claude) → install → launch → discover routes → Playwright screenshots
+           → summary.md + storyboard.json (validated) → Higgsfield MCP scenes → FFmpeg → final-demo.mp4
+```
+
+## Quick start
+
+Requirements: Node 20+, FFmpeg/ffprobe on `PATH`, and a Chromium for Playwright (`npx playwright install chromium`). Docker is optional but recommended.
+
+```bash
+npm install
+cp .env.example .env          # add ANTHROPIC_API_KEY (and optionally HIGGSFIELD_API_KEY)
+npm run dev:all               # web on :3000 + generation worker
+```
+
+Open http://localhost:3000, paste a repo URL and press **Generate Demo**. The worker can also run on its own (`npm run dev` + `npm run worker`).
+
+To run one generation without the web UI:
+
+```bash
+npm run once -- https://github.com/owner/repo
+npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no cloning
+```
+
+## Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude repository analysis, `summary.md` and storyboard. Without it, deterministic templates are used and labelled as such. |
+| `CLAUDE_MODEL` | Defaults to `claude-opus-5-5`. |
+| `HIGGSFIELD_MCP_URL` | Defaults to `https://mcp.higgsfield.ai/mcp`. |
+| `HIGGSFIELD_API_KEY` | Bearer token for the MCP server. Can also be set from **/settings** (stored server-side in `data/secrets/`). |
+| `HIGGSFIELD_VIDEO_TOOL` / `HIGGSFIELD_STATUS_TOOL` | Pin tool names if auto-discovery picks the wrong ones. |
+| `HIGGSFIELD_MAX_SCENES` | Cap Higgsfield calls per video (credits). Default 2. |
+| `DEMOFORGE_SANDBOX` | `local` (default) or `docker`. |
+| `DEMOFORGE_DOCKER_IMAGE` | Image for docker mode. Default `node:22-bookworm`. |
+| `MUSIC_PATH` | Optional royalty-free track. Otherwise a procedural ambient bed is synthesised. |
+| `WORKSPACE_ROOT`, `OUTPUT_ROOT`, `DATA_ROOT`, `FFMPEG_PATH`, `FFPROBE_PATH` | Paths. |
+
+Secrets are only read server-side. They are never sent to the browser, never placed in Claude prompts, and never passed to repository processes.
+
+## Architecture
+
+```
+src/
+  app/                    Next.js UI + route handlers
+    api/generate          POST: validate URL, enqueue job
+    api/jobs/[id]         GET job state (polled by the UI)
+    api/jobs/[id]/files   Serves video/screenshots/summary (Range support, traversal-safe)
+    api/jobs/[id]/scenes  PATCH: edit a scene → re-render (optionally re-generate with Higgsfield)
+    api/settings/…        Higgsfield token (server-side), connection test
+  lib/
+    github/      URL parsing/validation, shallow clone (symlinks disabled), repo metadata
+    agent/       heuristics.ts (static analysis: framework, PM, scripts, routes, env)
+                 claude.ts (Claude enrichment with structured outputs; repo content treated as untrusted)
+    sandbox/     install + start (scrubbed env, timeouts, process-group kill) or Docker
+    browser/     Playwright route discovery + desktop/mobile screenshots
+    storyboard/  summary + storyboard (Claude or template), Zod-validated and normalised
+    higgsfield/  MCP client: runtime tool discovery, schema-driven args, job polling, download
+    video/       FFmpeg: per-scene render, xfade transitions, typography, music, poster
+    storage/     file-based job store + worker heartbeat
+  pipeline.ts    stage orchestration
+workers/generation-worker.ts   polls the job store and runs one job at a time
+```
+
+Jobs live in `outputs/jobs/<id>/` (`job.json`, `project-analysis.json`, `summary.md`, `storyboard.json`, `screenshots/`, `scenes/`, `final-demo.mp4`, `logs/`). The UI polls real stage states (`pending/running/completed/failed/skipped`) and never shows invented percentages.
+
+### Honesty rules built into the pipeline
+
+- Product UI in the video always comes from real Playwright screenshots. Generated footage is only used for the hook, transitions and outro.
+- If Higgsfield isn't configured or a call fails, those scenes are rendered locally as motion-graphics title cards. The stage shows *skipped* or *failed* and the results page says so. Nothing is quietly swapped in.
+- If the app can't be installed or started, the stages are marked failed or skipped and the video falls back to title scenes, with a notice.
+- Claude may only choose start scripts that exist in `package.json`. Commands are argv arrays, never shell strings.
+
+### Higgsfield integration
+
+Higgsfield's hosted MCP tool catalogue varies, so DemoForge does **not** hard-code tool names. On each run it lists the server's tools and:
+
+1. Picks a text-to-video tool (or `HIGGSFIELD_VIDEO_TOOL`) and a job-status tool (or `HIGGSFIELD_STATUS_TOOL`).
+2. Fills arguments from the tool's JSON schema (prompt, `9:16` aspect, nearest allowed duration, defaults for other required fields).
+3. Takes a video URL from the result, or polls the status tool with the returned job id, then downloads and validates the clip with ffprobe.
+
+**Settings → Test connection** shows which tools were discovered. The official hosted server documents OAuth sign-in. DemoForge sends the configured token as `Authorization: Bearer …`. Whether a static token is accepted depends on your Higgsfield account and server, so check it with *Test connection*.
+
+## Security
+
+Repository code is untrusted. Current measures:
+
+- URL allow-list (github.com only, no credentials, strict owner/repo names). DemoForge builds the clone URL itself.
+- Unique disposable workspace per job, deleted afterwards. Shallow clone with `core.symlinks=false`, no hooks, size limit.
+- Repo processes run with a scrubbed environment (no API keys or tokens), a throwaway `HOME`, timeouts, and process-group cleanup.
+- The worker runs separately from the web server.
+- `DEMOFORGE_SANDBOX=docker` runs install and start in a container with memory, CPU and pid limits and `no-new-privileges`, publishing only to `127.0.0.1`.
+
+**This is a hackathon prototype, not a production-grade sandbox.** Local mode is not a security boundary, so use docker mode (ideally on a dedicated VM with restricted egress) for repositories you don't trust.
+
+## Testing
+
+```bash
+npm run typecheck && npm run lint && npm test
+npm run once -- --local tests/fixtures/launchpad
+```
+
+`npm test` covers URL validation, path traversal, storyboard validation and normalisation, README parsing, Higgsfield tool selection and argument building. It also runs an integration test of the MCP client against a local **mock** MCP server (test-only) covering submit → poll → download.
+
+## Status / known limitations
+
+- [x] Import, clone, static + Claude analysis, install/launch, route discovery, screenshots
+- [x] `summary.md`, validated `storyboard.json`, FFmpeg assembly with transitions, typography and music
+- [x] Results: preview, download, regenerate, per-scene edit and re-render, single-scene Higgsfield regenerate
+- [x] Settings: server-side Higgsfield token + connection test
+- [ ] Verified against the live Higgsfield MCP server (this dev environment couldn't reach it). The client is tested against a mock MCP server only.
+- [ ] Verified Claude calls with a real API key (no key in the dev environment). The template path is what has been exercised end to end.
+- [ ] Docker sandbox mode is implemented but has not yet been run end to end.
+- Monorepos, apps that need databases or secrets, and auth-gated pages may only produce the homepage or title scenes.
+- File-based job store with one worker. Fine for a demo, not for scale.
+
+Fonts: Inter (SIL OFL 1.1) and JetBrains Mono (Apache 2.0), bundled in `assets/fonts/`.

@@ -1,0 +1,9 @@
+{
+  "name": "launchpad",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Launchpad helps hackathon teams plan, track and ship their project in one weekend.",
+  "scripts": {
+    "dev": "node server.js"
+  }
+}
