@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StageList } from "./stage-list";
+import { AppConsole } from "./app-console";
 import { SceneCard } from "@/components/storyboard/scene-card";
 import { Markdown } from "@/components/storyboard/markdown";
 import { DEFAULT_SETTINGS } from "@/lib/validation/schemas";
@@ -112,7 +113,6 @@ export function JobView({ jobId }: { jobId: string }) {
   const done = job.stages.filter((s) => s.status === "completed" || s.status === "skipped").length;
   const elapsedSec = Math.max(0, Math.round(((active ? now : Date.parse(job.updatedAt)) - Date.parse(job.createdAt)) / 1000));
   const elapsed = elapsedSec >= 60 ? `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s` : `${elapsedSec}s`;
-  const aiScenes = sb?.scenes.filter((s) => s.visualType === "generated").length ?? 0;
   const download = hasVideo ? `${file(job.outputs.video!)}?download=1` : null;
 
   return (
@@ -145,7 +145,8 @@ export function JobView({ jobId }: { jobId: string }) {
               { k: "length", icon: Timer, label: `${settings.duration}s`, cls: "bg-pop-yellow" },
               { k: "scenes", icon: Clapperboard, label: `${settings.sceneCount} scenes`, cls: "bg-pop-cyan" },
               { k: "filter", icon: Palette, label: settings.filter === "none" ? "No filter" : settings.filter, cls: "bg-pop-purple capitalize" },
-              { k: "voice", icon: AudioLines, label: settings.voiceover ? "Voiceover" : "No voiceover", cls: settings.voiceover ? "bg-pop-orange" : "bg-white" },
+              { k: "motion", icon: null, label: `${settings.motion ?? "glide"} camera`, cls: "bg-pop-cyan capitalize" },
+              { k: "voice", icon: AudioLines, label: settings.voiceover ? `Voiceover · ${settings.voiceTone ?? "friendly"}` : "No voiceover", cls: settings.voiceover ? "bg-pop-orange" : "bg-white" },
             ].map(({ k, icon: Icon, label, cls }) => (
               <span key={k} className={`flex items-center gap-1 rounded-full border-2 border-black px-2 py-0.5 ${cls}`}>
                 {Icon && <Icon className="size-3" />} {label}
@@ -214,6 +215,8 @@ export function JobView({ jobId }: { jobId: string }) {
               <StageList stages={job.stages} />
             </CardContent>
           </Card>
+
+          <AppConsole jobId={job.id} active={active} />
 
           {job.notices.length > 0 && (
             <Card className="bg-pop-yellow/40">
@@ -361,7 +364,7 @@ export function JobView({ jobId }: { jobId: string }) {
                 ["Resolution", wide ? "1920×1080" : "1080×1920"],
                 ["Duration", sb ? `${sb.duration}s` : "-"],
                 ["Scenes", sb ? String(sb.scenes.length) : "-"],
-                ["Higgsfield scenes", sb ? `${job.outputs.generatedScenes?.length ?? 0} / ${aiScenes}` : "-"],
+                ["Higgsfield scenes", sb ? `${job.outputs.generatedScenes?.length ?? 0} / ${sb.scenes.length}` : "-"],
                 ["Filter", settings.filter],
                 ["Voiceover", settings.voiceover ? `${job.outputs.voiceover?.length ?? 0} line(s)` : "off"],
               ].map(([k, val]) => (

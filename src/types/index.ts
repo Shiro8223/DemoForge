@@ -46,6 +46,8 @@ export interface GeneratedScene {
   source: "higgsfield";
   tool: string;
   prompt: string;
+  /** Scene id whose screenshot this clip ends on (Higgsfield end frame): assembly plays it whole and dissolves into it. */
+  blendsInto?: string;
 }
 
 export interface VoiceoverClip {
@@ -53,6 +55,8 @@ export interface VoiceoverClip {
   /** Relative path of the ElevenLabs MP3. */
   file: string;
   text: string;
+  /** Voice and tone it was recorded with, so a changed voice re-records instead of reusing it. */
+  voice?: string;
 }
 
 export interface JobOutputs {

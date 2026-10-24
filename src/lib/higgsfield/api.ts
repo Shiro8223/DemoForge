@@ -11,7 +11,9 @@ import { randomUUID } from "node:crypto";
  *            then PUT the bytes to upload_url (presigned storage; never send our credentials there).
  *
  * Screenshots are animated with an IMAGE-to-video model (HIGGSFIELD_I2V_MODEL, default Kling 3.0 Standard
- * "kling-video/v3.0/std/image-to-video"): the uploaded real UI is the first frame.
+ * "kling-video/v3.0/std/image-to-video"): the uploaded real UI is the first frame. To blend screenshots, the
+ * next screenshot is sent as the last frame under HIGGSFIELD_END_FRAME_PARAM (default "end_image_url"); if the
+ * model refuses that field the clip is re-requested with the first frame only.
  *
  * The model is part of the URL path. Copy the exact path for a TEXT-to-video model from the
  * Models Gallery into HIGGSFIELD_MODEL. Default: Kling 3.0 Standard text-to-video
@@ -24,6 +26,7 @@ const env = () => ({
   base: (process.env.HIGGSFIELD_API_BASE || "https://api.higgsfield.ai").replace(/\/+$/, ""),
   model: (process.env.HIGGSFIELD_MODEL || "kling-video/v3.0/std/text-to-video").replace(/^\/+|\/+$/g, ""),
   i2vModel: (process.env.HIGGSFIELD_I2V_MODEL || "kling-video/v3.0/std/image-to-video").replace(/^\/+|\/+$/g, ""),
+  endFrameParam: (process.env.HIGGSFIELD_END_FRAME_PARAM || "end_image_url").trim(),
 });
 
 const IMAGE_TYPES: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
@@ -116,12 +119,14 @@ export async function generateClipViaApi(opts: {
   aspectRatio?: string;
   /** Animate this local image (image-to-video, first frame) instead of generating from text. */
   imageFile?: string;
+  /** With imageFile: end the clip on this image, so it morphs into the next screenshot. */
+  endImageFile?: string;
   outFile: string;
   onProgress?: (msg: string) => void;
   pollIntervalMs?: number;
   timeoutMs?: number;
-}): Promise<{ tool: string; url: string }> {
-  const { base } = env();
+}): Promise<{ tool: string; url: string; blended: boolean }> {
+  const { base, endFrameParam } = env();
   if (!apiConfigured()) throw new Error("Higgsfield API is not configured (HF_CREDENTIALS and HIGGSFIELD_MODEL).");
   const model = opts.imageFile ? env().i2vModel : env().model;
 
@@ -132,12 +137,17 @@ export async function generateClipViaApi(opts: {
     opts.onProgress?.("uploading screenshot");
     // Frame shape comes from the image itself; our soundtrack replaces native audio, so skip it.
     body = { prompt: opts.prompt, image_url: await uploadImage(opts.imageFile), duration, sound: "off" };
+    if (opts.endImageFile && endFrameParam) {
+      opts.onProgress?.("uploading next screenshot (end frame)");
+      body[endFrameParam] = await uploadImage(opts.endImageFile);
+    }
   } else {
     body = { prompt: opts.prompt, duration, aspect_ratio: opts.aspectRatio ?? "9:16" };
   }
+  let blended = !!endFrameParam && endFrameParam in body;
 
   // Same key on retry = Higgsfield won't charge twice for the same scene.
-  const idempotencyKey = randomUUID();
+  let idempotencyKey = randomUUID();
   let submit: Response;
   let first: Record<string, unknown>;
   for (let attempt = 0; ; attempt++) {
@@ -151,6 +161,14 @@ export async function generateClipViaApi(opts: {
     first = await readJson(submit);
     // Too many parallel requests comes back as 429, or 400 mentioning concurrency: back off and retry.
     const busy = submit.status === 429 || (submit.status === 400 && /concurren|too many|in progress|rate/i.test(JSON.stringify(first)));
+    // A model without end-frame support rejects the field: drop it and animate the first frame only.
+    if (blended && (submit.status === 400 || submit.status === 422) && !busy && JSON.stringify(first).includes(endFrameParam)) {
+      delete body[endFrameParam];
+      blended = false;
+      idempotencyKey = randomUUID(); // a different request, so it must not reuse the refused one's key
+      opts.onProgress?.(`${model} has no "${endFrameParam}", animating without blend`);
+      continue;
+    }
     if (!busy || attempt >= 5) break;
     await new Promise((r) => setTimeout(r, 15_000 * (attempt + 1)));
   }
@@ -179,7 +197,7 @@ export async function generateClipViaApi(opts: {
   const dl = await fetch(url, { signal: AbortSignal.timeout(5 * 60_000) });
   if (!dl.ok) throw new Error(`Downloading Higgsfield clip failed (${dl.status}).`);
   await fs.writeFile(opts.outFile, Buffer.from(await dl.arrayBuffer()));
-  return { tool: model, url };
+  return { tool: model, url, blended };
 }
 
 /**

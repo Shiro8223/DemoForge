@@ -12,6 +12,7 @@ import * as higgsfieldApi from "@/lib/higgsfield/api";
 import { assembleVideo, assertFfmpeg, frameFor, probeHasVideo } from "@/lib/video";
 import { elevenLabsConfigured, synthesizeSpeech } from "@/lib/tts/elevenlabs";
 import { jobDir, jobSettings, JobTracker } from "@/lib/storage/jobs";
+import { VOICES, type MotionStyle } from "@/lib/validation/schemas";
 import type { GeneratedScene, Job, Scene, Storyboard, VoiceoverClip } from "@/types";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).split("\n").slice(0, 6).join("\n").slice(0, 900);
@@ -199,21 +200,44 @@ async function writeStoryStages(t: JobTracker, shots: NonNullable<Job["outputs"]
   await t.stage("storyboard", "completed", `${story.storyboard.scenes.length} scenes · ${story.storyboard.duration}s · validated`);
 }
 
-/** Higgsfield prompt for one scene: its motion direction, the storyboard style, framing, grade and the user's instructions. */
-function clipPrompt(sb: Storyboard, scene: Scene, job: Job) {
+/** The screenshot scene this one should morph into (the next scene, when it is also a real screenshot). */
+function blendTarget(sb: Storyboard, scene: Scene, job: Job): Scene | null {
+  if (jobSettings(job).blendShots === false || scene.visualType !== "screenshot" || !scene.screenshot) return null;
+  const next = sb.scenes[sb.scenes.findIndex((s) => s.id === scene.id) + 1];
+  return next?.visualType === "screenshot" && next.screenshot && next.screenshot !== scene.screenshot ? next : null;
+}
+
+/** Camera style per Motion setting, for Higgsfield (the local renderer mirrors it in video/index.ts). */
+const MOTION_DIRECTION: Record<MotionStyle, string> = {
+  glide: "Slow, smooth, steady camera glide with a gentle push-in and soft parallax",
+  zoom: "Confident, punchy camera zooms into the key part of the screen, eased in and out, then hold",
+  dramatic: "Slow dramatic push-in with shallow depth of field and a soft light sweep, like a film trailer",
+};
+
+/** Said last, so it outweighs anything above: the usual source of random, unrelated footage. */
+const SCREENSHOT_GUARD =
+  "Camera motion only over this still interface: nothing new appears, nothing morphs or melts, no people, hands, objects, " +
+  "particles or abstract effects. Keep every UI element, word and layout exactly as captured, crisp and readable";
+
+/** Higgsfield prompt for one scene: its camera direction, the motion style, the user's instructions, grade and guards. */
+function clipPrompt(sb: Storyboard, scene: Scene, job: Job, blending = false) {
   const settings = jobSettings(job);
   const look = FILTER_LOOK[settings.filter];
   const framing = sb.aspectRatio === "16:9" ? "Widescreen 16:9" : "Vertical 9:16";
+  const motion = MOTION_DIRECTION[settings.motion ?? "glide"];
+  const direction = settings.instructions ? `Creative direction (mood and pacing only): ${settings.instructions.slice(0, 500)}` : "";
   const parts =
     scene.visualType === "screenshot"
       ? [
-          scene.videoPrompt,
-          "Animate this exact screenshot of the real app with smooth, slick cinematic motion. Keep every UI element, word and layout unchanged; add no new text or logos",
+          `Animate this exact screenshot of the real app. ${scene.videoPrompt}`,
+          motion,
+          ...(blending ? ["As one continuous camera move, flow seamlessly into the next screen of the same app, landing exactly on the final frame"] : []),
+          ...(direction ? [direction] : []),
+          ...(look ? [`Look: ${look}`] : []),
+          SCREENSHOT_GUARD,
         ]
-      : [scene.videoPrompt, `Style: ${sb.visualStyle}`, `${framing}, no on-screen text`];
-  if (look) parts.push(`Look: ${look}`);
-  if (settings.instructions) parts.push(`Creative direction: ${settings.instructions.slice(0, 600)}`);
-  return parts.join(". ") + ".";
+      : [scene.videoPrompt, motion, `Style: ${sb.visualStyle}`, ...(direction ? [direction] : []), ...(look ? [`Look: ${look}`] : []), `${framing}, no on-screen text`];
+  return parts.map((p) => p.trim().replace(/[.\s]+$/, "")).join(". ") + ".";
 }
 
 /** Runs `fn` over `items` with at most `limit` in flight. */
@@ -250,13 +274,15 @@ async function generateScenes(t: JobTracker, onlySceneId?: string) {
     const report = () => void t.stage("generate", "running", [...progress].map(([id, m]) => `${id}: ${m}`).join(" · "));
     await pool(targets, config.higgsfield.concurrency, async (s) => {
       const rel = `scenes/${s.id}.mp4`;
-      const prompt = clipPrompt(sb, s, job);
+      const into = blendTarget(sb, s, job);
+      const prompt = clipPrompt(sb, s, job, !!into);
       try {
         const r = await higgsfieldApi.generateClipViaApi({
           prompt,
           duration: s.duration,
           aspectRatio: sb.aspectRatio,
           imageFile: s.visualType === "screenshot" && s.screenshot ? path.join(jobDir(job.id), s.screenshot) : undefined,
+          endImageFile: into?.screenshot ? path.join(jobDir(job.id), into.screenshot) : undefined,
           outFile: path.join(jobDir(job.id), rel),
           onProgress: (m) => {
             progress.set(s.id, m);
@@ -264,7 +290,7 @@ async function generateScenes(t: JobTracker, onlySceneId?: string) {
           },
         });
         if (!(await probeHasVideo(path.join(jobDir(job.id), rel)))) throw new Error("Downloaded file is not a valid video");
-        made.push({ sceneId: s.id, file: rel, source: "higgsfield", tool: r.tool, prompt });
+        made.push({ sceneId: s.id, file: rel, source: "higgsfield", tool: r.tool, prompt, ...(r.blended && into ? { blendsInto: into.id } : {}) });
         progress.set(s.id, "done");
       } catch (e) {
         errors.push(`${s.id}: ${errMsg(e)}`);
@@ -343,26 +369,36 @@ async function voiceoverStage(t: JobTracker) {
     await t.notice("Voiceover was requested but ElevenLabs is not configured, so the video has music only.");
     return;
   }
-  await t.stage("voiceover", "running", "ElevenLabs");
+  const { voiceId = "", voiceTone = "friendly" } = jobSettings(job);
+  const voiceName = VOICES.find((v) => v.id === voiceId)?.name ?? "custom voice";
+  const voice = `${voiceId}|${voiceTone}`;
+  await t.stage("voiceover", "running", `ElevenLabs · ${voiceName} · ${voiceTone}`);
   const out = jobDir(job.id);
   await fs.mkdir(path.join(out, "voiceover"), { recursive: true });
   const previous = new Map((job.outputs.voiceover ?? []).map((v) => [v.sceneId, v]));
   const clips: VoiceoverClip[] = [];
   const errors: string[] = [];
-  for (const s of sb.scenes) {
-    const text = s.narration?.trim();
+  const lines = sb.scenes.map((s) => s.narration?.trim() ?? "");
+  for (const [i, s] of sb.scenes.entries()) {
+    const text = lines[i];
     if (!text) continue;
     const prev = previous.get(s.id);
     const exists = prev && (await fs.access(path.join(out, prev.file)).then(() => true, () => false));
-    if (prev && prev.text === text && exists) {
+    if (prev && prev.text === text && (prev.voice ?? "|friendly") === voice && exists) {
       clips.push(prev);
       continue;
     }
     const rel = `voiceover/${s.id}.mp3`;
     try {
       await t.stage("voiceover", "running", `${s.id}: recording`);
-      await synthesizeSpeech(text, path.join(out, rel));
-      clips.push({ sceneId: s.id, file: rel, text });
+      // The neighbouring lines let ElevenLabs keep one continuous delivery across the separate recordings.
+      await synthesizeSpeech(text, path.join(out, rel), {
+        voiceId: voiceId || undefined,
+        tone: voiceTone,
+        previousText: lines.slice(0, i).filter(Boolean).join(" ") || undefined,
+        nextText: lines.slice(i + 1).filter(Boolean).join(" ") || undefined,
+      });
+      clips.push({ sceneId: s.id, file: rel, text, voice });
     } catch (e) {
       errors.push(`${s.id}: ${errMsg(e)}`);
       // The same failure (bad key, no credits) would repeat for every scene.
@@ -373,7 +409,7 @@ async function voiceoverStage(t: JobTracker) {
   await t.save();
   if (errors.length) await t.notice(`Voiceover problems. Affected scenes have music only: ${errors.join(" | ")}`);
   if (!clips.length) await t.stage("voiceover", "failed", errors[0] ?? "No narration lines to record");
-  else await t.stage("voiceover", "completed", `${clips.length} line(s) via ElevenLabs`);
+  else await t.stage("voiceover", "completed", `${clips.length} line(s) via ElevenLabs · ${voiceName} · ${voiceTone}`);
 }
 
 async function assembleStage(t: JobTracker) {
@@ -381,16 +417,29 @@ async function assembleStage(t: JobTracker) {
   const out = jobDir(job.id);
   await t.stage("assemble", "running");
   const settings = jobSettings(job);
-  const clips = new Map((job.outputs.generatedScenes ?? []).map((g) => [g.sceneId, path.join(out, g.file)]));
+  const generated = job.outputs.generatedScenes ?? [];
+  const clips = new Map(generated.map((g) => [g.sceneId, path.join(out, g.file)]));
+  const scenes = job.outputs.storyboard!.scenes;
+  // Only while the storyboard still has that screenshot next (scene edits can reorder or swap shots).
+  const blends = new Set(
+    generated
+      .filter((g) => {
+        const i = scenes.findIndex((s) => s.id === g.sceneId);
+        return g.blendsInto && scenes[i + 1]?.id === g.blendsInto;
+      })
+      .map((g) => g.sceneId),
+  );
   const { duration } = await assembleVideo({
     storyboard: job.outputs.storyboard!,
     resolveShot: (rel) => path.join(out, rel),
     clipFor: (id) => clips.get(id) ?? null,
+    blendsIntoNext: (id) => blends.has(id),
     workDir: out,
     output: path.join(out, "final-demo.mp4"),
     poster: path.join(out, "poster.jpg"),
     repoLabel: `github.com/${job.owner}/${job.repo}`,
     filter: settings.filter,
+    motion: settings.motion,
     voiceover: settings.voiceover ? (job.outputs.voiceover ?? []).map((v) => ({ sceneId: v.sceneId, file: path.join(out, v.file) })) : [],
     onProgress: (m) => t.stage("assemble", "running", m),
   });

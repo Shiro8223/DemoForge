@@ -3,7 +3,7 @@ import path from "node:path";
 import { execa } from "execa";
 import { config } from "@/lib/config";
 import { transitionOverlap } from "@/lib/storyboard";
-import type { AspectRatio, Scene, Storyboard, VideoFilter } from "@/lib/validation/schemas";
+import type { AspectRatio, MotionStyle, Scene, Storyboard, VideoFilter } from "@/lib/validation/schemas";
 
 /**
  * FFmpeg assembly. Every scene is rendered to a normalised 1080x1920 (9:16) or 1920x1080 (16:9),
@@ -39,7 +39,7 @@ const FONT_MED = () => path.join(config.fontsDir, "Inter-Medium.otf");
 const FONT_MONO = () => path.join(config.fontsDir, "JetBrainsMono-Regular.ttf");
 
 async function ffmpeg(args: string[], timeout = 5 * 60_000) {
-  const r = await execa(config.ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", ...args], { timeout, reject: false, all: true });
+  const r = await execa(config.ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", ...args], { timeout, reject: false, all: true, windowsHide: true });
   if (r.exitCode !== 0) throw new Error(`ffmpeg failed: ${(r.all ?? "").slice(-1200)}`);
 }
 
@@ -49,21 +49,21 @@ async function ffmpeg(args: string[], timeout = 5 * 60_000) {
  */
 export async function assertFfmpeg(): Promise<void> {
   for (const [bin, env] of [[config.ffmpeg, "FFMPEG_PATH"], [config.ffprobe, "FFPROBE_PATH"]] as const) {
-    const r = await execa(bin, ["-version"], { reject: false });
+    const r = await execa(bin, ["-version"], { reject: false, windowsHide: true });
     if (r.exitCode !== 0)
       throw new Error(`${path.basename(bin)} can't be run ("${bin}"). Install FFmpeg, or set ${env} in .env to the full path of the executable, then restart.`);
   }
 }
 
 export async function probeDuration(file: string): Promise<number> {
-  const r = await execa(config.ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", file], { reject: false });
+  const r = await execa(config.ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", file], { reject: false, windowsHide: true });
   const d = parseFloat(r.stdout);
   if (r.exitCode !== 0 || Number.isNaN(d)) throw new Error(`Not a readable media file: ${path.basename(file)}`);
   return d;
 }
 
 export async function probeHasVideo(file: string): Promise<boolean> {
-  const r = await execa(config.ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_type", "-of", "csv=p=0", file], { reject: false });
+  const r = await execa(config.ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_type", "-of", "csv=p=0", file], { reject: false, windowsHide: true });
   return r.exitCode === 0 && r.stdout.trim() === "video";
 }
 
@@ -136,7 +136,28 @@ async function textFilters(opts: {
 const ENCODE = ["-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", "-r", String(FPS)];
 
 /** Real screenshot inside a rounded "device card" over a blurred copy of itself, with a slow push-in. */
-async function renderScreenshotScene(scene: Scene, shotFile: string, out: string, tmp: string, f: Frame) {
+type Move = "in" | "out" | "pan";
+
+/**
+ * zoompan expressions for one camera move, eased in and out. The opener zooms in, the closer pulls back, and
+ * the scenes between alternate so consecutive shots flow instead of repeating. Strength follows the Motion setting.
+ */
+export function cameraMove(index: number, count: number, motion: MotionStyle = "glide", frames: number) {
+  const amount = { glide: 0.08, zoom: 0.2, dramatic: 0.13 }[motion];
+  const move: Move = index === 0 ? "in" : index === count - 1 ? "out" : (["pan", "in", "out"] as const)[(index - 1) % 3];
+  const e = `((1-cos(PI*on/${frames}))/2)`;
+  // "zoom" heads for the upper middle, where most UIs keep their headline content; the others stay centred.
+  const fy = motion === "zoom" ? 0.35 : 0.5;
+  if (move === "pan") {
+    const z = (1 + amount).toFixed(3);
+    const from = index % 2 ? 0.15 : 0.85;
+    return { z, x: `(iw-iw/zoom)*(${from}+${(1 - 2 * from).toFixed(2)}*${e})`, y: `(ih-ih/zoom)*${fy}` };
+  }
+  const [a, b] = move === "in" ? [1, 1 + amount] : [1 + amount, 1];
+  return { z: `${a}${b >= a ? "+" : "-"}${Math.abs(b - a).toFixed(3)}*${e}`, x: "(iw-iw/zoom)*0.5", y: `(ih-ih/zoom)*${fy}` };
+}
+
+async function renderScreenshotScene(scene: Scene, shotFile: string, out: string, tmp: string, f: Frame, cam: ReturnType<typeof cameraMove>) {
   const { W, H } = f;
   const still = path.join(tmp, `${scene.id}-still.png`);
   // Portrait: phone-shaped card under a headline. Landscape: wide browser-shaped card under a one-line title.
@@ -175,7 +196,7 @@ async function renderScreenshotScene(scene: Scene, shotFile: string, out: string
     "-filter_complex",
     [
       // Upscale first so zoompan's integer rounding doesn't cause visible jitter.
-      `[0]scale=${W * 2}:${H * 2},zoompan=z='1+0.05*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS}`,
+      `[0]scale=${W * 2}:${H * 2},zoompan=z='${cam.z}':x='${cam.x}':y='${cam.y}':d=1:s=${W}x${H}:fps=${FPS}`,
       ...text,
     ].join(","),
     "-frames:v", String(frames), ...ENCODE, "-an", out,
@@ -206,11 +227,16 @@ async function renderTitleScene(scene: Scene, out: string, tmp: string, f: Frame
   ]);
 }
 
-/** Normalises a Higgsfield clip (any size/fps/length) to the scene's slot. */
-async function renderClipScene(scene: Scene, clip: string, out: string, tmp: string, f: Frame) {
+/**
+ * Normalises a Higgsfield clip (any size/fps/length) to the scene's slot. A clip that morphs into the next
+ * screenshot (`whole`) is sped up to fit rather than cut short, so its last frame (the next screen) is reached.
+ */
+async function renderClipScene(scene: Scene, clip: string, out: string, tmp: string, f: Frame, whole = false) {
   const { W, H } = f;
   const clipDur = await probeDuration(clip);
-  const pad = Math.max(0, scene.duration - clipDur + 0.1);
+  // Never slow footage down, and never past 2.5x; beyond that it's trimmed as before.
+  const speed = whole && clipDur > scene.duration ? Math.min(2.5, clipDur / scene.duration) : 1;
+  const pad = Math.max(0, scene.duration - clipDur / speed + 0.1);
   // Animated footage carries the scene, so the caption sits in the lower third instead of over the action.
   const lh = f.portrait ? 84 : 72;
   const text = await textFilters({
@@ -221,6 +247,7 @@ async function renderClipScene(scene: Scene, clip: string, out: string, tmp: str
     "-i", clip,
     "-vf",
     [
+      ...(speed > 1 ? [`setpts=PTS/${speed.toFixed(4)}`] : []),
       `scale=${W}:${H}:force_original_aspect_ratio=increase`,
       `crop=${W}:${H}`,
       `fps=${FPS}`,
@@ -247,12 +274,16 @@ export interface AssembleInput {
   resolveShot: (rel: string) => string;
   /** Absolute path of a Higgsfield clip for this scene, if one was generated. */
   clipFor: (sceneId: string) => string | null;
+  /** True when this scene's clip ends on the next scene's screenshot (Higgsfield end frame). */
+  blendsIntoNext?: (sceneId: string) => boolean;
   workDir: string;
   output: string;
   poster: string;
   repoLabel: string;
   /** Colour grade for the final cut. */
   filter?: VideoFilter;
+  /** Camera style for locally animated screenshots. */
+  motion?: MotionStyle;
   /** Per-scene voiceover MP3s (absolute paths), placed at each scene's start. */
   voiceover?: { sceneId: string; file: string }[];
   onProgress?: (msg: string) => Promise<void> | void;
@@ -287,9 +318,10 @@ export async function assembleVideo(input: AssembleInput): Promise<{ duration: n
     const isLast = i === scenes.length - 1;
     if (higgs) {
       // Higgsfield footage wins for every scene, including screenshots it animated from the real UI.
-      await renderClipScene(s, higgs, out, tmp, frame);
+      await renderClipScene(s, higgs, out, tmp, frame, input.blendsIntoNext?.(s.id) ?? false);
     } else if (s.visualType === "screenshot" && s.screenshot) {
-      await renderScreenshotScene(s, input.resolveShot(s.screenshot), out, tmp, frame);
+      const cam = cameraMove(i, scenes.length, input.motion, Math.round(s.duration * FPS));
+      await renderScreenshotScene(s, input.resolveShot(s.screenshot), out, tmp, frame, cam);
     } else {
       await renderTitleScene(s, out, tmp, frame, { index: i, footer: isLast ? `${input.repoLabel}  ·  made with DemoForge` : undefined });
     }
@@ -303,7 +335,8 @@ export async function assembleVideo(input: AssembleInput): Promise<{ duration: n
   for (let k = 1; k < clips.length; k++) {
     const tr = scenes[k].transition;
     const d = transitionOverlap(scenes[k]);
-    const kind = tr === "cut" ? "fade" : tr;
+    // A morph already lands on the next screen, so a plain dissolve makes the join invisible.
+    const kind = tr === "cut" || input.blendsIntoNext?.(scenes[k - 1].id) ? "fade" : tr;
     const label = `[v${k}]`;
     parts.push(`${prev}[${k}:v]xfade=transition=${kind}:duration=${d}:offset=${(length - d).toFixed(3)}${label}`);
     prev = label;

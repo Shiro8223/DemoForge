@@ -1,8 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { AudioLines, Clock, Clapperboard, MessageSquareText, Palette, RectangleHorizontal, RectangleVertical, Sparkles } from "lucide-react";
-import { FILTERS, LIMITS, maxScenesFor, type GenerationSettings, type VideoFilter } from "@/lib/validation/schemas";
+import { AudioLines, Blend, Clock, Clapperboard, MessageSquareText, Move, Palette, RectangleHorizontal, RectangleVertical } from "lucide-react";
+import {
+  FILTERS,
+  LIMITS,
+  maxScenesFor,
+  MOTIONS,
+  RECOMMENDED_HIGGSFIELD_PROMPT,
+  VOICE_TONES,
+  VOICES,
+  type GenerationSettings,
+  type MotionStyle,
+  type VideoFilter,
+  type VoiceTone,
+} from "@/lib/validation/schemas";
 import { cn } from "@/lib/utils";
 
 const FILTER_INFO: Record<VideoFilter, { label: string; css: string }> = {
@@ -14,6 +26,34 @@ const FILTER_INFO: Record<VideoFilter, { label: string; css: string }> = {
   warm: { label: "Warm", css: "sepia(0.3) saturate(1.3) hue-rotate(-12deg)" },
   cool: { label: "Cool", css: "hue-rotate(18deg) saturate(0.95) brightness(1.05)" },
 };
+
+const MOTION_INFO: Record<MotionStyle, { label: string; hint: string }> = {
+  glide: { label: "Glide", hint: "Smooth, steady drift" },
+  zoom: { label: "Zooms", hint: "Punchy zoom-ins" },
+  dramatic: { label: "Dramatic", hint: "Slow trailer push" },
+};
+
+const TONE_INFO: Record<VoiceTone, string> = { friendly: "Friendly", hype: "Hype", calm: "Calm", epic: "Epic" };
+
+/** Compact single-choice row: used for camera, voice and tone so the panel stays tidy. */
+function Pills<T extends string>(props: { label: string; options: readonly T[]; value: T; onChange: (v: T) => void; render: (v: T) => React.ReactNode; on: string }) {
+  return (
+    <div role="radiogroup" aria-label={props.label} className="flex flex-wrap gap-1.5">
+      {props.options.map((o) => (
+        <button
+          key={o || "default"}
+          type="button"
+          role="radio"
+          aria-checked={props.value === o}
+          onClick={() => props.onChange(o)}
+          className={cn("brutal-press rounded-lg border-2 border-black px-2.5 py-1 text-left text-[12px] font-bold text-black", props.value === o ? `${props.on} shadow-brutal-sm` : "bg-white")}
+        >
+          {props.render(o)}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** The same colourful swatch under each filter's CSS approximation, so the tiles preview the look. */
 const SWATCH = "linear-gradient(135deg, #ff7ac0 0 33%, #ffd93d 33% 66%, #5aa9ff 66%)";
@@ -36,6 +76,26 @@ const Chip = ({ children, className }: { children: React.ReactNode; className?: 
   <span className={cn("rounded-lg border-2 border-black px-2 py-0.5 font-display text-lg leading-tight normal-case text-black", className)}>{children}</span>
 );
 
+/** Brutalist on/off switch. */
+function Switch({ on, label, disabled, onToggle }: { on: boolean; label: string; disabled?: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onToggle}
+      className={cn(
+        "relative h-8 w-14 shrink-0 rounded-full border-3 border-black transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        on ? "bg-black" : "bg-white",
+      )}
+    >
+      <span className={cn("absolute top-0.5 size-5 rounded-md border-2 border-black transition-all", on ? "left-[26px] bg-pop-yellow" : "left-0.5 bg-pop-pink")} />
+    </button>
+  );
+}
+
 function Slider(props: { label: string; min: number; max: number; value: number; onChange: (v: number) => void; color: string }) {
   const fill = props.max === props.min ? 100 : ((props.value - props.min) / (props.max - props.min)) * 100;
   return (
@@ -55,8 +115,6 @@ function Slider(props: { label: string; min: number; max: number; value: number;
 
 /** Pre-generation options shown under the URL field once a repository is chosen. */
 export type HiggsfieldInfo = { mode: "api" | "mcp" | "off"; maxScenes: number };
-
-const INSTRUCTION_IDEAS = "e.g. Hype trailer energy, lean into the real-time board, end on our hackathon win. Neon city at night for the AI shots.";
 
 export function GenerationOptions({
   value,
@@ -163,6 +221,29 @@ export function GenerationOptions({
       </div>
 
       <div className="mt-6">
+        <Section icon={Move} label="Camera" value={<span className="text-[11px] font-bold text-black/60">How the screenshots move</span>}>
+          <div role="radiogroup" aria-label="Camera" className="grid grid-cols-3 gap-2">
+            {MOTIONS.map((m) => {
+              const on = (value.motion ?? "glide") === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => set({ motion: m })}
+                  className={cn("brutal-press rounded-xl border-3 border-black px-3 py-2 text-left", on ? "bg-pop-cyan shadow-brutal-sm" : "bg-white")}
+                >
+                  <span className="block text-[13px] font-bold">{MOTION_INFO[m].label}</span>
+                  <span className="block text-[11px] text-black/70">{MOTION_INFO[m].hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+      </div>
+
+      <div className="mt-6">
         <Section
           icon={MessageSquareText}
           label="Custom instructions"
@@ -173,77 +254,85 @@ export function GenerationOptions({
             maxLength={1000}
             rows={3}
             onChange={(e) => set({ instructions: e.target.value })}
-            placeholder={INSTRUCTION_IDEAS}
+            onKeyDown={(e) => {
+              // Tab in an empty field accepts the greyed-out suggestion; otherwise Tab moves focus as usual.
+              if (e.key === "Tab" && !e.shiftKey && !value.instructions.trim()) {
+                e.preventDefault();
+                set({ instructions: RECOMMENDED_HIGGSFIELD_PROMPT });
+              }
+            }}
+            placeholder={RECOMMENDED_HIGGSFIELD_PROMPT}
             aria-label="Custom instructions for this video"
             className="w-full resize-y rounded-xl border-3 border-black bg-white px-3 py-2.5 text-sm text-fg placeholder:text-black/40 focus-visible:bg-pop-yellow/20 focus-visible:shadow-brutal-sm focus-visible:outline-none"
           />
-          <p className="mt-1.5 text-[11px] font-bold text-black/60">Steers the storyboard, captions and every Higgsfield shot.</p>
+          <p className="mt-1.5 text-[11px] font-bold text-black/60">
+            Steers the storyboard, captions and every Higgsfield shot.
+            {!value.instructions.trim() && (
+              <>
+                {" "}Press <kbd className="rounded border-2 border-black bg-white px-1 font-mono text-[10px] text-black">Tab</kbd> to use the suggestion.
+              </>
+            )}
+          </p>
         </Section>
+        {higgsfield?.mode === "api" && (
+          <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border-3 border-black bg-pop-purple/25 p-3.5">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-sm font-bold text-black">
+                <Blend className="size-4" /> Blend screenshots
+              </p>
+              <p className="mt-0.5 text-[12px] text-black/75">
+                Each screenshot flows into the next, so the app tour plays as one continuous take.
+              </p>
+            </div>
+            <Switch on={value.blendShots} label="Blend screenshots" onToggle={() => set({ blendShots: !value.blendShots })} />
+          </div>
+        )}
       </div>
 
-      {higgsfield && (
-        <div className={cn("mt-6 flex items-start gap-3 rounded-xl border-3 border-black p-3.5", higgsfield.mode === "off" ? "bg-panel-2" : "bg-pop-purple")}>
-          <Sparkles className="mt-0.5 size-5 shrink-0" />
-          <div className="text-[13px] text-black">
-            {higgsfield.mode === "api" ? (
-              <>
-                <p className="font-bold">
-                  Higgsfield animates {Math.min(value.sceneCount, higgsfield.maxScenes)} of {value.sceneCount} scenes
-                </p>
-                <p className="mt-0.5 text-[12px] text-black/75">
-                  Real screenshots come alive with image-to-video; hook and closing shots are generated. Each animated scene uses Higgsfield credits.
-                  {higgsfield.maxScenes < value.sceneCount && " Raise HIGGSFIELD_MAX_SCENES to animate them all."}
-                </p>
-              </>
-            ) : higgsfield.mode === "mcp" ? (
-              <p className="font-bold">Higgsfield (MCP) animates the generated scenes. Add HF_CREDENTIALS to also animate the real screenshots.</p>
-            ) : (
-              <p className="font-bold">
-                Higgsfield isn&apos;t connected, so scenes use local motion.{" "}
-                <Link href="/settings" className="underline decoration-2 underline-offset-2">Set it up</Link>
-              </p>
-            )}
+      <div className={cn("mt-6 rounded-xl border-3 border-black p-3.5", value.voiceover ? "bg-pop-orange" : "bg-panel-2")}>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm font-bold text-black">
+              <AudioLines className="size-4" /> Voiceover <span className="font-medium text-black/70">· ElevenLabs</span>
+            </p>
+            <p className="mt-0.5 text-[12px] text-black/75">
+              {voiceAvailable ? (
+                "A narrator reads one line per scene, over the music."
+              ) : (
+                <>
+                  Add <code className="font-mono">ELEVENLABS_API_KEY</code> to enable.{" "}
+                  <Link href="/settings#voiceover" className="font-bold underline decoration-2 underline-offset-2">
+                    How
+                  </Link>
+                </>
+              )}
+            </p>
           </div>
+          <Switch on={value.voiceover} label="Voiceover" disabled={!voiceAvailable} onToggle={() => set({ voiceover: !value.voiceover })} />
         </div>
-      )}
-
-      <div className={cn("mt-6 flex items-center justify-between gap-4 rounded-xl border-3 border-black p-3.5", value.voiceover ? "bg-pop-orange" : "bg-panel-2")}>
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-sm font-bold text-black">
-            <AudioLines className="size-4" /> Voiceover <span className="font-medium text-black/70">· ElevenLabs</span>
-          </p>
-          <p className="mt-0.5 text-[12px] text-black/75">
-            {voiceAvailable ? (
-              "A narrator reads one line per scene, over the music."
-            ) : (
-              <>
-                Add <code className="font-mono">ELEVENLABS_API_KEY</code> to enable.{" "}
-                <Link href="/settings#voiceover" className="font-bold underline decoration-2 underline-offset-2">
-                  How
-                </Link>
-              </>
-            )}
-          </p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={value.voiceover}
-          aria-label="Voiceover"
-          disabled={!voiceAvailable}
-          onClick={() => set({ voiceover: !value.voiceover })}
-          className={cn(
-            "relative h-8 w-14 shrink-0 rounded-full border-3 border-black transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-            value.voiceover ? "bg-black" : "bg-white",
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 size-5 rounded-md border-2 border-black transition-all",
-              value.voiceover ? "left-[26px] bg-pop-yellow" : "left-0.5 bg-pop-pink",
-            )}
-          />
-        </button>
+        {value.voiceover && (
+          // Only while narration is on, so the panel stays short otherwise.
+          <div className="mt-3.5 grid gap-3 border-t-2 border-black/20 pt-3.5 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-x-4">
+            <span className="text-[12px] font-bold text-black">Voice</span>
+            <Pills
+              label="Voice"
+              options={VOICES.map((v) => v.id)}
+              value={value.voiceId ?? ""}
+              onChange={(id) => set({ voiceId: id })}
+              on="bg-pop-yellow"
+              render={(id) => {
+                const v = VOICES.find((x) => x.id === id)!;
+                return (
+                  <>
+                    {v.name} <span className="font-medium text-black/60">· {v.hint}</span>
+                  </>
+                );
+              }}
+            />
+            <span className="text-[12px] font-bold text-black">Tone</span>
+            <Pills label="Tone" options={VOICE_TONES} value={value.voiceTone ?? "friendly"} onChange={(t) => set({ voiceTone: t })} on="bg-pop-yellow" render={(t) => TONE_INFO[t]} />
+          </div>
+        )}
       </div>
     </section>
   );

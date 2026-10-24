@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseGitHubUrl } from "@/lib/github";
-import { sceneStarts, wrapText } from "@/lib/video";
+import { cameraMove, sceneStarts, wrapText } from "@/lib/video";
 import { parseReadme } from "@/lib/agent/heuristics";
 import { finaliseStoryboard, runtimeOf, templateStoryboard } from "@/lib/storyboard";
 import { generationSettingsSchema, maxScenesFor, storyboardSchema, type ProjectAnalysis } from "@/lib/validation/schemas";
@@ -57,7 +57,11 @@ test("template storyboard validates and uses real screenshots", () => {
   const sb = templateStoryboard({ analysis, screenshots: shots, repoUrl: "x" });
   assert.ok(storyboardSchema.safeParse(sb).success);
   assert.ok(sb.duration >= 15 && sb.duration <= 30, `duration ${sb.duration}`);
-  assert.deepEqual(sb.scenes.filter((s) => s.visualType === "screenshot").map((s) => s.screenshot), shots.map((s) => s.mobile));
+  // Every scene shows the real app (no invented hook/closing footage), and every capture is used.
+  assert.ok(sb.scenes.every((s) => s.visualType === "screenshot" && s.screenshot));
+  assert.deepEqual(new Set(sb.scenes.map((s) => s.screenshot)), new Set(shots.map((s) => s.mobile)));
+  // The closing bookends on the first screen shown.
+  assert.equal(sb.scenes.at(-1)!.screenshot, sb.scenes[1].screenshot);
   assert.equal(new Set(sb.scenes.map((s) => s.id)).size, sb.scenes.length);
 });
 
@@ -114,12 +118,23 @@ test("sceneStarts accounts for transition overlap", () => {
   assert.deepEqual(starts.map((x) => Math.round(x * 100) / 100), [0, 3.5, 8.46]);
 });
 
-test("finaliseStoryboard demotes scenes with unknown screenshots instead of rendering black frames", () => {
+test("finaliseStoryboard swaps unknown screenshots for captured ones instead of rendering black frames", () => {
   const sb = templateStoryboard({ analysis, screenshots: shots, repoUrl: "x" });
   const fixed = finaliseStoryboard(sb, shots.slice(0, 1));
-  const s3 = fixed.scenes[2];
-  assert.equal(s3.visualType, "generated");
-  assert.equal(s3.screenshot, null);
+  assert.ok(fixed.scenes.every((s) => s.visualType === "screenshot" && s.screenshot === shots[0].mobile));
+  // With nothing captured at all, the scene is demoted to a generated one rather than a black frame.
+  const none = finaliseStoryboard(sb, []);
+  assert.equal(none.scenes[2].visualType, "generated");
+  assert.equal(none.scenes[2].screenshot, null);
+});
+
+test("camera moves open with a zoom in, close with a pull back and vary in between", () => {
+  const moves = [0, 1, 2, 3, 4].map((i) => cameraMove(i, 5, "glide", 90));
+  assert.match(moves[0].z, /^1\+/);
+  assert.match(moves[4].z, /^1\.08-/);
+  assert.equal(moves[1].z, "1.080"); // pan holds the zoom and moves x
+  assert.notEqual(new Set(moves.map((m) => m.z + m.x)).size, 1);
+  assert.ok(cameraMove(0, 5, "zoom", 90).z.includes("0.200"));
 });
 
 const tools: ToolInfo[] = [

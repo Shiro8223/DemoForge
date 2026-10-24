@@ -54,7 +54,7 @@ function scrubbedEnv(home: string, port: number): Record<string, string> {
 
 async function hasBinary(bin: string) {
   try {
-    await execa("which", [bin]);
+    await execa("which", [bin], { windowsHide: true });
     return true;
   } catch {
     return false;
@@ -104,7 +104,7 @@ export async function installDependencies(repoDir: string, home: string, analysi
   let log = "";
   for (const [bin, ...args] of attempts) {
     const started = Date.now();
-    const r = await execa(bin, args, {
+    const child = execa(bin, args, {
       cwd,
       env: scrubbedEnv(home, 0),
       extendEnv: false,
@@ -112,8 +112,17 @@ export async function installDependencies(repoDir: string, home: string, analysi
       all: true,
       reject: false,
       stdin: "ignore",
+      windowsHide: true,
     });
-    log += `$ ${bin} ${args.join(" ")}\n${r.all ?? ""}\n`;
+    // Stream to the log as it runs so the job page's console shows the install live.
+    const head = `${log}$ ${bin} ${args.join(" ")}\n`;
+    let live = "";
+    child.all?.on("data", (d: Buffer) => {
+      live += d.toString();
+      fs.writeFile(logFile, head + live).catch(() => {});
+    });
+    const r = await child;
+    log = `${head}${r.all ?? ""}\n`;
     await fs.writeFile(logFile, log);
     if (r.exitCode === 0)
       return { ok: true, detail: `${bin} ${args[0]} (${Math.round((Date.now() - started) / 1000)}s)`, log };
@@ -228,10 +237,10 @@ export async function startApp(opts: {
         "-v", `${repoDir}:/app`, "-w", "/app",
         config.dockerImage, "sh", "-c", script.replace(/127\.0\.0\.1/g, "0.0.0.0"),
       ],
-      { all: true, reject: false, stdin: "ignore" },
+      { all: true, reject: false, stdin: "ignore", windowsHide: true },
     );
     stop = async () => {
-      await execa("docker", ["rm", "-f", name], { reject: false });
+      await execa("docker", ["rm", "-f", name], { reject: false, windowsHide: true });
     };
   } else {
     await fs.mkdir(path.join(home, "tmp"), { recursive: true });
@@ -239,7 +248,10 @@ export async function startApp(opts: {
       cwd: appDir,
       env: scrubbedEnv(home, port),
       extendEnv: false,
-      detached: true, // own process group so we can kill the whole tree
+      // Own process group on POSIX so we can kill the whole tree. Never on Windows: a detached child gets its
+      // own console, so npm, cmd and node each pop up a visible window. There taskkill /T reaches the tree anyway.
+      detached: process.platform !== "win32",
+      windowsHide: true,
       all: true,
       reject: false,
       stdin: "ignore",
@@ -248,7 +260,7 @@ export async function startApp(opts: {
       if (!child.pid) return;
       // Negative-PID group kills don't exist on Windows (process.kill throws and the app keeps running), so kill the tree.
       if (process.platform === "win32") {
-        await execa("taskkill", ["/pid", String(child.pid), "/T", "/F"], { reject: false });
+        await execa("taskkill", ["/pid", String(child.pid), "/T", "/F"], { reject: false, windowsHide: true });
         return;
       }
       try {

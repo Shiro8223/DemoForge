@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const ffmpeg = await execa(config.ffmpeg, ["-version"], { reject: false }).then((r) => r.exitCode === 0, () => false);
+  const ffmpeg = await execa(config.ffmpeg, ["-version"], { reject: false, windowsHide: true }).then((r) => r.exitCode === 0, () => false);
   return NextResponse.json({
     worker: await workerAlive(),
     gemini: !!config.gemini.apiKey,

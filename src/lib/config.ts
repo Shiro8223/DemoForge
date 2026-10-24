@@ -1,8 +1,9 @@
 import path from "node:path";
 import dotenv from "dotenv";
 
-// .env wins; .env.example is a temporary fallback until env vars move to Vercel.
-dotenv.config({ path: [".env", ".env.example"], quiet: true });
+// .env.local (where `elevenlabs onboard` stores its key) wins, then .env; .env.example is a temporary fallback
+// until env vars move to Vercel. Next loads .env.local for the web server itself, but the worker needs it here.
+dotenv.config({ path: [".env.local", ".env", ".env.example"], quiet: true });
 
 // turbopackIgnore: runtime paths only; keeps the build from tracing the whole project.
 const root = /*turbopackIgnore: true*/ process.cwd();

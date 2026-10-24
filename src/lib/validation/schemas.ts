@@ -19,6 +19,28 @@ export const LIMITS = { minDuration: 10, maxDuration: 30, minScenes: 3, maxScene
 export const maxScenesFor = (duration: number) =>
   Math.max(LIMITS.minScenes, Math.min(LIMITS.maxScenes, Math.floor(duration / LIMITS.minSecondsPerScene)));
 
+/** Suggested custom instructions (greyed out, Tab accepts). Also the Higgsfield motion direction when the field is empty. */
+export const RECOMMENDED_HIGGSFIELD_PROMPT =
+  "A sleek product-launch tour of the real app: smooth cinematic zooms and pans that flow from one screen into the next, " +
+  "building from the first impression to the key feature. Confident, premium and modern pacing; the interface stays crisp " +
+  "and exactly as captured.";
+
+/** Camera style for every shot: Higgsfield's motion prompt and the local zoom/pan animation. */
+export const MOTIONS = ["glide", "zoom", "dramatic"] as const;
+export type MotionStyle = (typeof MOTIONS)[number];
+
+/** Narrator delivery: shapes the script's wording and ElevenLabs' voice settings. */
+export const VOICE_TONES = ["friendly", "hype", "calm", "epic"] as const;
+export type VoiceTone = (typeof VOICE_TONES)[number];
+
+/** ElevenLabs premade voices offered in the picker. "" = the server's ELEVENLABS_VOICE_ID. */
+export const VOICES = [
+  { id: "", name: "Default", hint: "George, or your ELEVENLABS_VOICE_ID" },
+  { id: "nPczCjzI2devNBz1zQrb", name: "Brian", hint: "Deep narrator" },
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", hint: "Bright, confident" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam", hint: "Young, energetic" },
+] as const;
+
 /** Options picked on the home page before a generation starts. */
 export const generationSettingsSchema = z
   .object({
@@ -29,6 +51,11 @@ export const generationSettingsSchema = z
     voiceover: z.boolean().default(false),
     /** Optional creative direction from the user, passed to Gemini and every Higgsfield prompt. */
     instructions: z.string().trim().max(1000).default(""),
+    /** Animate each screenshot so it morphs into the next one (Higgsfield end frame), for one continuous take. */
+    blendShots: z.boolean().default(true),
+    motion: z.enum(MOTIONS).default("glide"),
+    voiceId: z.enum(VOICES.map((v) => v.id) as [string, ...string[]]).default(""),
+    voiceTone: z.enum(VOICE_TONES).default("friendly"),
   })
   .transform((s) => ({ ...s, sceneCount: Math.min(s.sceneCount, maxScenesFor(s.duration)) }));
 export type GenerationSettings = z.infer<typeof generationSettingsSchema>;

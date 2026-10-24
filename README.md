@@ -40,6 +40,7 @@ npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no clo
 | `HF_CREDENTIALS` | **Recommended.** Higgsfield developer API key pair from console.higgsfield.ai, as `KEY_ID:KEY_SECRET`. When set, it is used instead of MCP. Check it for free with `npx tsx scripts/check-higgsfield.ts`. |
 | `HIGGSFIELD_MODEL` | Text-to-video model path for the developer API. Default `kling-video/v3.0/std/text-to-video`; Seedance 2.5 is `bytedance/seedance-2.5/text-to-video`. |
 | `HIGGSFIELD_API_BASE` | Defaults to `https://api.higgsfield.ai`. |
+| `HIGGSFIELD_END_FRAME_PARAM` | Request field for the last frame when **Blend screenshots** is on (each animated screenshot morphs into the next). Default `end_image_url`. If the model rejects it, the clip is re-requested without a blend. |
 | `HIGGSFIELD_MCP_URL` | MCP fallback only. Defaults to `https://mcp.higgsfield.ai/mcp`. |
 | `HIGGSFIELD_API_KEY` | MCP fallback only: bearer token for the MCP server (the hosted server expects OAuth, so prefer `HF_CREDENTIALS`). Can also be set from **/settings** (stored server-side in `data/secrets/`). |
 | `HIGGSFIELD_VIDEO_TOOL` / `HIGGSFIELD_STATUS_TOOL` | Pin tool names if auto-discovery picks the wrong ones. |

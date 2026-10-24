@@ -88,6 +88,11 @@ export async function listJobs(limit = 20): Promise<Job[]> {
   return jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
 }
 
+/** Removes a job and everything it produced. */
+export async function deleteJob(id: string): Promise<void> {
+  await fs.rm(jobDir(id), { recursive: true, force: true, maxRetries: 5 });
+}
+
 export async function nextPendingJob(): Promise<Job | null> {
   const jobs = await listJobs(200);
   return jobs.filter((j) => j.status === "pending").sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))[0] ?? null;
