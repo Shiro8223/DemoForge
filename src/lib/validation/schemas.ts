@@ -25,7 +25,8 @@ export const projectAnalysisSchema = z.object({
   routes: z.array(z.string()),
   features: z.array(z.string()),
   setupRisks: z.array(z.string()),
-  analysedBy: z.enum(["claude", "heuristic"]),
+  // "claude" is kept so jobs created before the Gemini migration still load.
+  analysedBy: z.enum(["gemini", "claude", "heuristic"]),
 });
 export type ProjectAnalysis = z.infer<typeof projectAnalysisSchema>;
 

@@ -5,7 +5,7 @@
 DemoForge turns a public GitHub repository into a 20–30 second vertical (9:16) promo video. It launches the app, films the **real UI**, writes a grounded summary and storyboard, generates cinematic scenes with Higgsfield, and cuts the result together with FFmpeg.
 
 ```
-GitHub URL → clone → analyse (Claude) → install → launch → discover routes → Playwright screenshots
+GitHub URL → clone → analyse (Gemini) → install → launch → discover routes → Playwright screenshots
            → summary.md + storyboard.json (validated) → Higgsfield MCP scenes → FFmpeg → final-demo.mp4
 ```
 
@@ -15,7 +15,7 @@ Requirements: Node 20+, FFmpeg/ffprobe on `PATH`, and a Chromium for Playwright 
 
 ```bash
 npm install
-cp .env.example .env          # add ANTHROPIC_API_KEY (and optionally HIGGSFIELD_API_KEY)
+cp .env.example .env          # add GEMINI_API_KEY (and optionally HIGGSFIELD_API_KEY)
 npm run dev:all               # web on :3000 + generation worker
 ```
 
@@ -32,8 +32,9 @@ npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no clo
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude repository analysis, `summary.md` and storyboard. Without it, deterministic templates are used and labelled as such. |
-| `CLAUDE_MODEL` | Defaults to `claude-opus-5-5`. |
+| `GEMINI_API_KEY` | Gemini repository analysis, `summary.md` and storyboard. Without it, deterministic templates are used and labelled as such. |
+| `GEMINI_MODEL` | Defaults to `gemini-3.5-flash`. |
+| `GEMINI_FALLBACK_MODEL` | Optional. Retried when the main model is rate-limited or returns a server error, e.g. `gemini-3.5-flash-lite`. |
 | `HIGGSFIELD_MCP_URL` | Defaults to `https://mcp.higgsfield.ai/mcp`. |
 | `HIGGSFIELD_API_KEY` | Bearer token for the MCP server. Can also be set from **/settings** (stored server-side in `data/secrets/`). |
 | `HIGGSFIELD_VIDEO_TOOL` / `HIGGSFIELD_STATUS_TOOL` | Pin tool names if auto-discovery picks the wrong ones. |
@@ -43,7 +44,7 @@ npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no clo
 | `MUSIC_PATH` | Optional royalty-free track. Otherwise a procedural ambient bed is synthesised. |
 | `WORKSPACE_ROOT`, `OUTPUT_ROOT`, `DATA_ROOT`, `FFMPEG_PATH`, `FFPROBE_PATH` | Paths. |
 
-Secrets are only read server-side. They are never sent to the browser, never placed in Claude prompts, and never passed to repository processes.
+Secrets are only read server-side. They are never sent to the browser, never placed in Gemini prompts, and never passed to repository processes.
 
 ## Architecture
 
@@ -58,10 +59,10 @@ src/
   lib/
     github/      URL parsing/validation, shallow clone (symlinks disabled), repo metadata
     agent/       heuristics.ts (static analysis: framework, PM, scripts, routes, env)
-                 claude.ts (Claude enrichment with structured outputs; repo content treated as untrusted)
+                 gemini.ts (Gemini enrichment with structured outputs; repo content treated as untrusted)
     sandbox/     install + start (scrubbed env, timeouts, process-group kill) or Docker
     browser/     Playwright route discovery + desktop/mobile screenshots
-    storyboard/  summary + storyboard (Claude or template), Zod-validated and normalised
+    storyboard/  summary + storyboard (Gemini or template), Zod-validated and normalised
     higgsfield/  MCP client: runtime tool discovery, schema-driven args, job polling, download
     video/       FFmpeg: per-scene render, xfade transitions, typography, music, poster
     storage/     file-based job store + worker heartbeat
@@ -76,7 +77,7 @@ Jobs live in `outputs/jobs/<id>/` (`job.json`, `project-analysis.json`, `summary
 - Product UI in the video always comes from real Playwright screenshots. Generated footage is only used for the hook, transitions and outro.
 - If Higgsfield isn't configured or a call fails, those scenes are rendered locally as motion-graphics title cards. The stage shows *skipped* or *failed* and the results page says so. Nothing is quietly swapped in.
 - If the app can't be installed or started, the stages are marked failed or skipped and the video falls back to title scenes, with a notice.
-- Claude may only choose start scripts that exist in `package.json`. Commands are argv arrays, never shell strings.
+- Gemini may only choose start scripts that exist in `package.json`. Commands are argv arrays, never shell strings.
 
 ### Higgsfield integration
 
@@ -111,12 +112,12 @@ npm run once -- --local tests/fixtures/launchpad
 
 ## Status / known limitations
 
-- [x] Import, clone, static + Claude analysis, install/launch, route discovery, screenshots
+- [x] Import, clone, static + Gemini analysis, install/launch, route discovery, screenshots
 - [x] `summary.md`, validated `storyboard.json`, FFmpeg assembly with transitions, typography and music
 - [x] Results: preview, download, regenerate, per-scene edit and re-render, single-scene Higgsfield regenerate
 - [x] Settings: server-side Higgsfield token + connection test
 - [ ] Verified against the live Higgsfield MCP server (this dev environment couldn't reach it). The client is tested against a mock MCP server only.
-- [ ] Verified Claude calls with a real API key (no key in the dev environment). The template path is what has been exercised end to end.
+- [x] Verified Gemini structured-output calls with a real API key. A full end-to-end job run has not been done yet.
 - [ ] Docker sandbox mode is implemented but has not yet been run end to end.
 - Monorepos, apps that need databases or secrets, and auth-gated pages may only produce the homepage or title scenes.
 - File-based job store with one worker. Fine for a demo, not for scale.

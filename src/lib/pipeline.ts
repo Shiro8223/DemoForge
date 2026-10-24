@@ -3,7 +3,7 @@ import path from "node:path";
 import { config } from "@/lib/config";
 import { cloneRepository, fetchRepoMeta, parseGitHubUrl, type RepoMeta } from "@/lib/github";
 import { analyseHeuristically, type HeuristicResult } from "@/lib/agent/heuristics";
-import { claudeAvailable, enrichAnalysis } from "@/lib/agent/claude";
+import { geminiAvailable, enrichAnalysis } from "@/lib/agent/gemini";
 import { installDependencies, startApp, type RunningApp } from "@/lib/sandbox";
 import { captureScreenshots, discoverFeatureRoutes } from "@/lib/browser";
 import { templateStoryboard, templateSummary, writeStory } from "@/lib/storyboard";
@@ -66,18 +66,18 @@ async function fullPipeline(t: JobTracker, opts: RunOptions) {
     const h = await analyseHeuristically(repoDir, parsed.repo);
     if (meta?.description && !h.analysis.description) h.analysis.description = meta.description;
     let analysis = h.analysis;
-    if (claudeAvailable()) {
+    if (geminiAvailable()) {
       try {
         analysis = await enrichAnalysis(repoDir, h);
       } catch (e) {
-        await t.notice(`Claude analysis failed, using static analysis instead: ${errMsg(e)}`);
+        await t.notice(`Gemini analysis failed, using static analysis instead: ${errMsg(e)}`);
       }
     } else {
-      await t.notice("ANTHROPIC_API_KEY is not set: analysis, summary and storyboard use DemoForge's deterministic templates instead of Claude.");
+      await t.notice("GEMINI_API_KEY is not set: analysis, summary and storyboard use DemoForge's deterministic templates instead of Gemini.");
     }
     job.outputs.analysis = analysis;
     await fs.writeFile(path.join(out, "project-analysis.json"), JSON.stringify(analysis, null, 2));
-    await t.stage("analyze", "completed", `${analysis.framework} · ${analysis.packageManager} · ${analysis.analysedBy === "claude" ? "Claude" : "static analysis"}`);
+    await t.stage("analyze", "completed", `${analysis.framework} · ${analysis.packageManager} · ${analysis.analysedBy === "gemini" ? "Gemini" : "static analysis"}`);
 
     // 3-6. Install, start, discover, screenshot ---------------------------------
     const shots = await runAndCapture(t, repoDir, workspace, h, analysis, logs, (a) => (app = a));
@@ -170,19 +170,19 @@ async function writeStoryStages(t: JobTracker, shots: NonNullable<Job["outputs"]
   const job = t.job;
   const out = jobDir(job.id);
   const input = { analysis: job.outputs.analysis!, screenshots: shots, repoUrl: job.repoUrl, stars: meta?.stars, topics: meta?.topics };
-  await t.stage("summary", "running", claudeAvailable() ? "Claude is writing" : "Template");
+  await t.stage("summary", "running", geminiAvailable() ? "Gemini is writing" : "Template");
   let story;
   try {
     story = await writeStory(input);
   } catch (e) {
-    await t.notice(`Claude storyboard failed, used template instead: ${errMsg(e)}`);
+    await t.notice(`Gemini storyboard failed, used template instead: ${errMsg(e)}`);
     const storyboard = templateStoryboard(input);
     story = { storyboard, summary: templateSummary(input, storyboard), authoredBy: "template" as const };
   }
   await fs.writeFile(path.join(out, "summary.md"), story.summary);
   job.outputs.summary = "summary.md";
   job.outputs.authoredBy = story.authoredBy;
-  await t.stage("summary", "completed", story.authoredBy === "claude" ? "Written by Claude" : "Template");
+  await t.stage("summary", "completed", story.authoredBy === "gemini" ? "Written by Gemini" : "Template");
 
   await t.stage("storyboard", "running");
   await fs.writeFile(path.join(out, "storyboard.json"), JSON.stringify(story.storyboard, null, 2));

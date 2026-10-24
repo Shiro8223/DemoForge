@@ -1,5 +1,8 @@
 import path from "node:path";
-import "dotenv/config";
+import dotenv from "dotenv";
+
+// .env wins; .env.example is a temporary fallback until env vars move to Vercel.
+dotenv.config({ path: [".env", ".env.example"], quiet: true });
 
 // turbopackIgnore: runtime paths only; keeps the build from tracing the whole project.
 const root = /*turbopackIgnore: true*/ process.cwd();
@@ -16,8 +19,11 @@ export const config = {
   musicPath: process.env.MUSIC_PATH || "",
   sandbox: (process.env.DEMOFORGE_SANDBOX === "docker" ? "docker" : "local") as "docker" | "local",
   dockerImage: process.env.DEMOFORGE_DOCKER_IMAGE || "node:22-bookworm",
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
-  claudeModel: process.env.CLAUDE_MODEL || "claude-opus-5-5",
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || "",
+    model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
+    fallbackModel: process.env.GEMINI_FALLBACK_MODEL || "",
+  },
   higgsfield: {
     url: process.env.HIGGSFIELD_MCP_URL || "https://mcp.higgsfield.ai/mcp",
     apiKey: process.env.HIGGSFIELD_API_KEY || "",

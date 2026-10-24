@@ -23,7 +23,7 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 export default function SettingsPage() {
-  const claude = !!config.anthropicApiKey;
+  const gemini = !!config.gemini.apiKey;
   return (
     <main className="mx-auto max-w-5xl px-4 pt-10 pb-24 sm:px-6">
       <div className="mb-10">
@@ -50,18 +50,19 @@ export default function SettingsPage() {
           <HiggsfieldSettings maxScenes={config.higgsfield.maxScenes}>
             <section id="generation" className="card-inset scroll-mt-20 rounded-2xl border border-line bg-panel/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-base font-semibold tracking-tight">Claude</h2>
-                <Badge variant={claude ? "success" : "warning"}>
-                  <span className={cn("size-1.5 rounded-full", claude ? "bg-emerald-400" : "bg-amber-400")} />
-                  {claude ? "Configured via ANTHROPIC_API_KEY" : "Not configured"}
+                <h2 className="text-base font-semibold tracking-tight">Gemini</h2>
+                <Badge variant={gemini ? "success" : "warning"}>
+                  <span className={cn("size-1.5 rounded-full", gemini ? "bg-emerald-400" : "bg-amber-400")} />
+                  {gemini ? "Configured via GEMINI_API_KEY" : "Not configured"}
                 </Badge>
               </div>
               <p className="mt-4 text-sm leading-relaxed text-muted">Reads the repository to ground the analysis, then writes summary.md and the storyboard.</p>
               <div className="mt-4 flex flex-wrap gap-3">
-                <Field label="Model" value={config.claudeModel} />
+                <Field label="Model" value={config.gemini.model} />
+                {config.gemini.fallbackModel && <Field label="Fallback model" value={config.gemini.fallbackModel} />}
               </div>
               <p className="mt-4 text-[13px] leading-relaxed text-muted">
-                Set <code className="font-mono text-fg">ANTHROPIC_API_KEY</code> in <code className="font-mono text-fg">.env</code> on the server. Without
+                Set <code className="font-mono text-fg">GEMINI_API_KEY</code> in <code className="font-mono text-fg">.env</code> on the server. Without
                 it, DemoForge uses deterministic templates built from static analysis, and the output is labelled as a template storyboard.
               </p>
             </section>

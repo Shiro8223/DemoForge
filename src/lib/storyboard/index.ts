@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { claudeAvailable, structured } from "@/lib/agent/claude";
+import { geminiAvailable, structured } from "@/lib/agent/gemini";
 import { storyboardSchema, TRANSITIONS, type ProjectAnalysis, type Storyboard } from "@/lib/validation/schemas";
 import type { Screenshot } from "@/types";
 
@@ -33,7 +33,7 @@ export function finaliseStoryboard(sb: Storyboard, screenshots: Screenshot[]): S
 }
 
 // ---------------------------------------------------------------------------
-// Deterministic fallback (used when no Anthropic key is configured)
+// Deterministic fallback (used when no Gemini key is configured)
 // ---------------------------------------------------------------------------
 
 /** Short, punchy opener: the description's first clause if it fits on screen, else "Meet <name>". */
@@ -136,17 +136,17 @@ export function templateSummary(input: StoryInput, sb: Storyboard): string {
     "## Closing message",
     sb.scenes[sb.scenes.length - 1].textOverlay,
     "",
-    "_Written from repository evidence by DemoForge's template engine (no Claude API key configured)._",
+    "_Written from repository evidence by DemoForge's template engine (no Gemini API key configured)._",
     "",
   ];
   return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
-// Claude-authored version
+// Gemini-authored version
 // ---------------------------------------------------------------------------
 
-export async function claudeStory(input: StoryInput): Promise<{ summary: string; storyboard: Storyboard }> {
+export async function geminiStory(input: StoryInput): Promise<{ summary: string; storyboard: Storyboard }> {
   const shotPaths = input.screenshots.map((s) => s.mobile);
   const sceneOut = z.object({
     title: z.string(),
@@ -200,10 +200,10 @@ export async function claudeStory(input: StoryInput): Promise<{ summary: string;
   return { summary: out.summaryMarkdown, storyboard };
 }
 
-export async function writeStory(input: StoryInput): Promise<{ summary: string; storyboard: Storyboard; authoredBy: "claude" | "template" }> {
-  if (claudeAvailable()) {
-    const r = await claudeStory(input);
-    return { ...r, authoredBy: "claude" };
+export async function writeStory(input: StoryInput): Promise<{ summary: string; storyboard: Storyboard; authoredBy: "gemini" | "template" }> {
+  if (geminiAvailable()) {
+    const r = await geminiStory(input);
+    return { ...r, authoredBy: "gemini" };
   }
   const storyboard = templateStoryboard(input);
   return { summary: templateSummary(input, storyboard), storyboard, authoredBy: "template" };

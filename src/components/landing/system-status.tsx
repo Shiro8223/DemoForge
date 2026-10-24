@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
-type Health = { worker: boolean; claude: boolean; higgsfield: boolean; ffmpeg: boolean; sandbox: string };
+type Health = { worker: boolean; gemini: boolean; higgsfield: boolean; ffmpeg: boolean; sandbox: string };
 
 export function SystemStatus() {
   const [h, setH] = useState<Health | null>(null);
@@ -28,7 +28,7 @@ export function SystemStatus() {
   return (
     <div className="flex flex-wrap items-center justify-center gap-2.5">
       {item(h.worker, h.worker ? "Worker · online" : "Worker · offline — run npm run worker")}
-      {item(h.claude, h.claude ? "Claude · online" : "Claude · templates only", true)}
+      {item(h.gemini, h.gemini ? "Gemini · online" : "Gemini · templates only", true)}
       <Link href="/settings">{item(h.higgsfield, h.higgsfield ? "Higgsfield · online" : "Higgsfield · not connected", true)}</Link>
       {item(h.ffmpeg, h.ffmpeg ? "FFmpeg · ready" : "FFmpeg · missing")}
       {item(h.sandbox === "docker", `Sandbox · ${h.sandbox}`, true)}

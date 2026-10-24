@@ -5,7 +5,7 @@ import { RecentJobs } from "@/components/landing/recent-jobs";
 
 const STEPS = [
   { icon: GitBranch, title: "Clone", body: "Your public repo lands in an isolated, throwaway workspace." },
-  { icon: Brain, title: "Understand", body: "Claude reads the code to find the framework, routes and real features." },
+  { icon: Brain, title: "Understand", body: "Gemini reads the code to find the framework, routes and real features." },
   { icon: Rocket, title: "Launch", body: "Dependencies install and the app boots in a sandbox." },
   { icon: Camera, title: "Capture", body: "Playwright screenshots the actual UI, desktop and mobile." },
   { icon: LayoutTemplate, title: "Storyboard", body: "A grounded summary and a validated 9:16 storyboard." },

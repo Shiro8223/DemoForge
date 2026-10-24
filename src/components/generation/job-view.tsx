@@ -130,7 +130,7 @@ export function JobView({ jobId }: { jobId: string }) {
             )}
             <span className="rounded-md border border-line bg-panel-2 px-2 py-0.5 font-mono text-[11px] text-muted">{job.id}</span>
             {job.outputs.authoredBy && (
-              <Badge>{job.outputs.authoredBy === "claude" ? "Storyboard by Claude" : "Template storyboard"}</Badge>
+              <Badge>{job.outputs.authoredBy === "gemini" ? "Storyboard by Gemini" : job.outputs.authoredBy === "claude" ? "Storyboard by Claude" : "Template storyboard"}</Badge>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-4 text-[13px] text-muted">
@@ -267,7 +267,7 @@ export function JobView({ jobId }: { jobId: string }) {
                     ["Framework", a.framework],
                     ["Package manager", a.packageManager],
                     ["Start", a.startScript ? `${a.packageManager} run ${a.startScript}` : a.runKind],
-                    ["Analysed by", a.analysedBy === "claude" ? "Claude" : "Static analysis"],
+                    ["Analysed by", a.analysedBy === "gemini" ? "Gemini" : a.analysedBy === "claude" ? "Claude" : "Static analysis"],
                   ].map(([k, val]) => (
                     <div key={k} className="rounded-xl border border-line bg-panel-2 p-3">
                       <dt className="text-[11px] tracking-wide text-muted uppercase">{k}</dt>

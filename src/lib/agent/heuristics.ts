@@ -4,7 +4,7 @@ import type { ProjectAnalysis } from "@/lib/validation/schemas";
 
 /**
  * Deterministic repository inspection. This is the source of truth for anything
- * that ends up being executed (package manager, script names, app dir); Claude
+ * that ends up being executed (package manager, script names, app dir); Gemini
  * only enriches descriptive fields on top of it.
  */
 

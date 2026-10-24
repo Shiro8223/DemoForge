@@ -55,8 +55,8 @@ export interface JobOutputs {
   generatedScenes?: GeneratedScene[];
   video?: string; // relative path to final-demo.mp4
   poster?: string;
-  /** Who produced the summary/storyboard: Claude or the deterministic fallback. */
-  authoredBy?: "claude" | "template";
+  /** Who produced the summary/storyboard: Gemini (or Claude, for older jobs) or the deterministic fallback. */
+  authoredBy?: "gemini" | "claude" | "template";
   appUrl?: string;
 }
 

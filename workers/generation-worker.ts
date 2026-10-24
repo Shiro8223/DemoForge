@@ -26,7 +26,7 @@ async function recoverStaleJobs() {
 
 async function main() {
   console.log(`[worker] DemoForge worker up · sandbox=${config.sandbox} · outputs=${config.outputRoot}`);
-  console.log(`[worker] Claude: ${config.anthropicApiKey ? `enabled (${config.claudeModel})` : "disabled (no ANTHROPIC_API_KEY)"}`);
+  console.log(`[worker] Gemini: ${config.gemini.apiKey ? `enabled (${config.gemini.model})` : "disabled (no GEMINI_API_KEY)"}`);
   await recoverStaleJobs();
   while (!stopping) {
     await writeHeartbeat(null).catch(() => {});

@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div className="flex items-center gap-2.5 text-[13px] text-muted">
           <LogoMark size="sm" />
           <span>DemoForge</span>
-          <span className="hidden text-muted/60 sm:inline">· Powered by Claude, Higgsfield &amp; FFmpeg</span>
+          <span className="hidden text-muted/60 sm:inline">· Powered by Gemini, Higgsfield &amp; FFmpeg</span>
         </div>
         <div className="flex items-center gap-5 text-[13px] text-muted">
           <a href={`${REPO_URL}#readme`} target="_blank" rel="noreferrer" className="transition-colors hover:text-fg">Docs</a>
