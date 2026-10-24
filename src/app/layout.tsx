@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
 const inter = localFont({ src: "../../assets/fonts/Inter-Medium.otf", variable: "--font-inter", weight: "500" });
@@ -15,13 +16,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${interDisplay.variable} ${jetbrains.variable}`}>
-      <body className="min-h-dvh">
-        <div className="pointer-events-none fixed inset-0 -z-10">
-          <div className="glow absolute inset-0" />
-          <div className="bg-grid absolute inset-0" />
-        </div>
+      <body className="flex min-h-dvh flex-col">
+        <div className="bg-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[900px]" />
         <SiteHeader />
-        {children}
+        <div className="flex-1">{children}</div>
+        <SiteFooter />
       </body>
     </html>
   );

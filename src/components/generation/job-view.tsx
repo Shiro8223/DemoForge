@@ -3,12 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, Download, ExternalLink, Info, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, Clock, Download, ExternalLink, Info, Link2, Loader2, RefreshCw, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StageList } from "./stage-list";
-import { StatusDot } from "./status-dot";
 import { SceneCard } from "@/components/storyboard/scene-card";
 import { Markdown } from "@/components/storyboard/markdown";
 import type { Job } from "@/types";
@@ -21,6 +20,8 @@ export function JobView({ jobId }: { jobId: string }) {
   const [higgsfield, setHiggsfield] = useState(false);
   const [workerUp, setWorkerUp] = useState(true);
   const [regenBusy, setRegenBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(
     () =>
@@ -42,6 +43,12 @@ export function JobView({ jobId }: { jobId: string }) {
       clearInterval(t);
     };
   }, [load, active]);
+
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [active]);
 
   useEffect(() => {
     fetch("/api/health").then((r) => r.json()).then((h) => {
@@ -66,6 +73,16 @@ export function JobView({ jobId }: { jobId: string }) {
     else setRegenBusy(false);
   }
 
+  function copyLink() {
+    navigator.clipboard.writeText(window.location.href).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => {},
+    );
+  }
+
   if (missing)
     return (
       <div className="mx-auto max-w-xl px-4 py-24 text-center">
@@ -86,55 +103,70 @@ export function JobView({ jobId }: { jobId: string }) {
   const file = (rel: string) => `/api/jobs/${job.id}/files/${rel}`;
   const v = encodeURIComponent(job.updatedAt);
   const hasVideo = !!job.outputs.video && job.stages.find((s) => s.id === "assemble")?.status === "completed";
+  const done = job.stages.filter((s) => s.status === "completed" || s.status === "skipped").length;
+  const elapsedSec = Math.max(0, Math.round(((active ? now : Date.parse(job.updatedAt)) - Date.parse(job.createdAt)) / 1000));
+  const elapsed = elapsedSec >= 60 ? `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s` : `${elapsedSec}s`;
+  const aiScenes = sb?.scenes.filter((s) => s.visualType === "generated").length ?? 0;
+  const download = hasVideo ? `${file(job.outputs.video!)}?download=1` : null;
 
   return (
     <main className="mx-auto max-w-6xl px-4 pt-8 pb-24 sm:px-6">
-      <Link href="/" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
-        <ArrowLeft className="size-4" /> New demo
-      </Link>
+      <nav className="mb-5 flex items-center gap-2 text-[13px]">
+        <Link href="/#recent" className="text-muted transition-colors hover:text-fg">Jobs</Link>
+        <ChevronRight className="size-3.5 text-muted" />
+        <span className="truncate font-mono text-fg">{job.projectId}</span>
+      </nav>
 
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-2">
-            <StatusDot status={job.status} />
-            <Badge variant={job.status === "completed" ? "success" : job.status === "failed" ? "danger" : "accent"}>
-              {job.status === "pending" ? "queued" : job.status}
-            </Badge>
+          <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
+            <h1 className="truncate font-display text-2xl font-bold tracking-tight sm:text-[28px]">{a?.name ?? job.repo}</h1>
+            {job.status === "completed" ? (
+              <Badge variant="success"><Check /> Completed</Badge>
+            ) : job.status === "failed" ? (
+              <Badge variant="danger">Failed</Badge>
+            ) : (
+              <Badge variant="accent"><Loader2 className="animate-spin" /> {job.status === "pending" ? "Queued" : "Running"}</Badge>
+            )}
+            <span className="rounded-md border border-line bg-panel-2 px-2 py-0.5 font-mono text-[11px] text-muted">{job.id}</span>
             {job.outputs.authoredBy && (
               <Badge>{job.outputs.authoredBy === "claude" ? "Storyboard by Claude" : "Template storyboard"}</Badge>
             )}
           </div>
-          <h1 className="truncate font-display text-3xl font-bold tracking-tight sm:text-4xl">{a?.name ?? job.repo}</h1>
-          <a href={job.repoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 font-mono text-sm text-muted hover:text-fg">
-            {job.projectId} <ExternalLink className="size-3.5" />
-          </a>
-        </div>
-        {!active && (
-          <div className="flex flex-wrap gap-2">
-            {hasVideo && (
-              <Button asChild>
-                <a href={`${file(job.outputs.video!)}?download=1`}>
-                  <Download /> Download MP4
-                </a>
-              </Button>
-            )}
-            <Button variant="secondary" onClick={regenerate} disabled={regenBusy}>
-              {regenBusy ? <Loader2 className="animate-spin" /> : <RefreshCw />} Regenerate
-            </Button>
+          <div className="flex flex-wrap items-center gap-4 text-[13px] text-muted">
+            <span className="flex items-center gap-1.5">
+              <Clock className="size-3.5" /> Started {new Date(job.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Timer className="size-3.5" /> {active ? "Elapsed" : "Took"} <span className="font-mono text-fg">{elapsed}</span>
+            </span>
           </div>
-        )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="secondary">
+            <a href={job.repoUrl} target="_blank" rel="noreferrer"><ExternalLink /> Open repo</a>
+          </Button>
+          <Button variant="secondary" onClick={regenerate} disabled={active || regenBusy}>
+            {regenBusy ? <Loader2 className="animate-spin" /> : <RefreshCw />} Regenerate
+          </Button>
+          {download ? (
+            <Button asChild><a href={download}><Download /> Download MP4</a></Button>
+          ) : (
+            <Button disabled><Download /> Download MP4</Button>
+          )}
+        </div>
       </div>
 
       {active && !workerUp && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />
           <p>No generation worker is running, so this job is waiting in the queue. Start one with <code className="font-mono">npm run worker</code>.</p>
         </div>
       )}
 
       {job.status === "failed" && job.error && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-300" />
           <div className="min-w-0">
             <p className="font-medium">Generation failed</p>
             <p className="mt-1 font-mono text-xs whitespace-pre-wrap text-red-200/80">{job.error}</p>
@@ -142,46 +174,22 @@ export function JobView({ jobId }: { jobId: string }) {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-        {/* Left: video or pipeline */}
-        <div className="space-y-6">
-          {hasVideo ? (
-            <div className="overflow-hidden rounded-3xl border border-line bg-black shadow-[0_30px_80px_-30px_rgb(139_92_246/0.6)]">
-              <video
-                key={v}
-                src={`${file(job.outputs.video!)}?v=${v}`}
-                poster={job.outputs.poster ? `${file(job.outputs.poster)}?v=${v}` : undefined}
-                controls
-                playsInline
-                className="aspect-[9/16] w-full bg-black"
-              />
-            </div>
-          ) : (
-            <div className="relative grid aspect-[9/16] place-items-center overflow-hidden rounded-3xl border border-line bg-panel">
-              {shots[0] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={file(shots[0].mobile)} alt="" className="absolute inset-0 size-full object-cover object-top opacity-25 blur-sm" />
-              ) : null}
-              <div className="relative text-center">
-                {active ? <Loader2 className="mx-auto size-8 animate-spin text-violet-300" /> : <AlertTriangle className="mx-auto size-8 text-muted" />}
-                <p className="mt-3 text-sm text-muted">{active ? "Your demo is being forged…" : "No video produced"}</p>
-              </div>
-            </div>
-          )}
-
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
+        {/* Left: pipeline and details */}
+        <div className="min-w-0 space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Pipeline</CardTitle>
-              <CardDescription>Live status of each stage. Nothing here is simulated.</CardDescription>
+            <CardHeader className="flex-row items-start justify-between gap-3">
+              <div>
+                <CardTitle>Pipeline</CardTitle>
+                <CardDescription className="mt-0.5">Live status of each stage. Nothing here is simulated.</CardDescription>
+              </div>
+              <span className="font-mono text-xs text-muted">{done} / {job.stages.length}</span>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-2">
               <StageList stages={job.stages} />
             </CardContent>
           </Card>
-        </div>
 
-        {/* Right: details */}
-        <div className="min-w-0 space-y-6">
           {job.notices.length > 0 && (
             <Card className="border-amber-500/20">
               <CardHeader className="pb-2">
@@ -191,6 +199,58 @@ export function JobView({ jobId }: { jobId: string }) {
                 <ul className="space-y-1.5 text-sm text-fg/80">
                   {job.notices.map((n, i) => <li key={i} className="break-words">• {n}</li>)}
                 </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {sb && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Storyboard</CardTitle>
+                <CardDescription>
+                  {sb.scenes.length} scenes · {sb.duration}s · {sb.aspectRatio} · {sb.visualStyle}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 pt-2 sm:grid-cols-3 xl:grid-cols-5">
+                {sb.scenes.map((s, i) => (
+                  <SceneCard
+                    key={`${s.id}-${job.updatedAt}`}
+                    jobId={job.id}
+                    scene={s}
+                    index={i}
+                    generated={job.outputs.generatedScenes?.find((g) => g.sceneId === s.id)}
+                    editable={!active}
+                    higgsfield={higgsfield}
+                    onQueued={load}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {shots.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Screenshots</CardTitle>
+                <CardDescription>Real renders of the running app via Playwright.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 pt-2 sm:grid-cols-2">
+                {shots.map((s) => (
+                  <a
+                    key={s.route}
+                    href={file(s.desktop)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group overflow-hidden rounded-xl border border-line bg-panel-2 transition-colors hover:border-line-strong"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={file(s.desktop)} alt={s.title} className="aspect-[16/10] w-full object-cover object-top transition group-hover:opacity-90" />
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                      <span className="truncate text-xs">{s.title}</span>
+                      <code className="font-mono text-[11px] text-muted">{s.route}</code>
+                    </div>
+                  </a>
+                ))}
               </CardContent>
             </Card>
           )}
@@ -228,63 +288,71 @@ export function JobView({ jobId }: { jobId: string }) {
             </Card>
           )}
 
-          {sb && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Storyboard</CardTitle>
-                <CardDescription>
-                  {sb.scenes.length} scenes · {sb.duration}s · {sb.aspectRatio} · {sb.visualStyle}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {sb.scenes.map((s, i) => (
-                  <SceneCard
-                    key={`${s.id}-${job.updatedAt}`}
-                    jobId={job.id}
-                    scene={s}
-                    index={i}
-                    generated={job.outputs.generatedScenes?.find((g) => g.sceneId === s.id)}
-                    editable={!active}
-                    higgsfield={higgsfield}
-                    onQueued={load}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {shots.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Captured screenshots</CardTitle>
-                <CardDescription>Real renders of the running app via Playwright.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                {shots.map((s) => (
-                  <a key={s.route} href={file(s.desktop)} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-xl border border-line bg-panel-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={file(s.desktop)} alt={s.title} className="aspect-[16/10] w-full object-cover object-top transition group-hover:opacity-90" />
-                    <div className="flex items-center justify-between gap-2 px-3 py-2">
-                      <span className="truncate text-xs">{s.title}</span>
-                      <code className="font-mono text-[11px] text-muted">{s.route}</code>
-                    </div>
-                  </a>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
           {summary && (
             <Card>
               <CardHeader className="flex-row items-center justify-between">
-                <CardTitle>summary.md</CardTitle>
-                <a href={`${file("summary.md")}?download=1`} className="text-xs text-muted hover:text-fg">Download</a>
+                <CardTitle className="font-mono">summary.md</CardTitle>
+                <a href={`${file("summary.md")}?download=1`} className="text-xs text-muted transition-colors hover:text-fg">Download</a>
               </CardHeader>
               <CardContent>
                 <Markdown source={summary} />
               </CardContent>
             </Card>
           )}
+        </div>
+
+        {/* Right: player and output, sticky on desktop */}
+        <div className="space-y-6 self-start lg:sticky lg:top-20">
+          {hasVideo ? (
+            <div className="overflow-hidden rounded-3xl border border-line bg-black shadow-[0_30px_80px_-30px_rgb(139_92_246/0.6)]">
+              <video
+                key={v}
+                src={`${file(job.outputs.video!)}?v=${v}`}
+                poster={job.outputs.poster ? `${file(job.outputs.poster)}?v=${v}` : undefined}
+                controls
+                playsInline
+                className="aspect-[9/16] w-full bg-black"
+              />
+            </div>
+          ) : (
+            <div className="relative grid aspect-[9/16] place-items-center overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-violet-900/40 via-black to-cyan-900/30">
+              {shots[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={file(shots[0].mobile)} alt="" className="absolute inset-0 size-full object-cover object-top opacity-25 blur-sm" />
+              ) : null}
+              <div className="relative text-center">
+                {active ? <Loader2 className="mx-auto size-8 animate-spin text-violet-300" /> : <AlertTriangle className="mx-auto size-8 text-muted" />}
+                <p className="mt-3 text-sm text-muted">{active ? "Your demo is being forged…" : "No video produced"}</p>
+              </div>
+            </div>
+          )}
+
+          <Card className="p-5">
+            <CardTitle className="mb-3">Output</CardTitle>
+            <dl className="space-y-2.5 text-[13px]">
+              {[
+                ["Resolution", "1080×1920"],
+                ["Duration", sb ? `${sb.duration}s` : "—"],
+                ["Scenes", sb ? String(sb.scenes.length) : "—"],
+                ["Higgsfield scenes", sb ? `${job.outputs.generatedScenes?.length ?? 0} / ${aiScenes}` : "—"],
+              ].map(([k, val]) => (
+                <div key={k} className="flex items-center justify-between gap-3">
+                  <dt className="text-muted">{k}</dt>
+                  <dd className="font-mono text-fg">{val}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-4 space-y-2">
+              {download ? (
+                <Button asChild className="w-full"><a href={download}><Download /> Download MP4</a></Button>
+              ) : (
+                <Button disabled className="w-full"><Download /> Download MP4</Button>
+              )}
+              <Button variant="secondary" className="w-full" onClick={copyLink}>
+                {copied ? <Check /> : <Link2 />} {copied ? "Copied" : "Copy link"}
+              </Button>
+            </div>
+          </Card>
         </div>
       </div>
     </main>

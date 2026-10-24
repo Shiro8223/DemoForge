@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, KeyRound, Loader2, Plug, Trash2 } from "lucide-react";
+import { CircleCheck, Eye, EyeOff, KeyRound, Link2, Loader2, Plug, Save, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 type Status = { configured: false } | { configured: true; source: "settings" | "env"; hint: string; url: string };
-type TestResult = { ok: boolean; error?: string; tools?: string[]; videoTool?: string | null; statusTool?: string | null };
+type TestResult = { ok: boolean; error?: string; tools?: string[]; videoTool?: string | null; statusTool?: string | null; ms?: number };
 
-export function HiggsfieldSettings() {
+const DEFAULT_URL = "https://mcp.higgsfield.ai/mcp";
+
+/** Higgsfield integration card plus the danger zone, which shares its key state; `children` render between them. */
+export function HiggsfieldSettings({ maxScenes, children }: { maxScenes: number; children?: React.ReactNode }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [token, setToken] = useState("");
+  const [reveal, setReveal] = useState(false);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState<"save" | "test" | "clear" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -43,8 +46,9 @@ export function HiggsfieldSettings() {
   async function runTest() {
     setBusy("test");
     setTest(null);
+    const started = performance.now();
     const res = await fetch("/api/settings/higgsfield/test", { method: "POST" });
-    setTest(await res.json());
+    setTest({ ...(await res.json()), ms: Math.round(performance.now() - started) });
     setBusy(null);
   }
 
@@ -56,64 +60,129 @@ export function HiggsfieldSettings() {
     load();
   }
 
+  const removable = status?.configured && status.source === "settings";
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-2"><Plug className="size-4 text-violet-300" /> Higgsfield MCP</CardTitle>
-          {status?.configured ? (
-            <Badge variant="success">Connected · {status.source === "env" ? "from .env" : "saved"} · {status.hint}</Badge>
-          ) : (
-            <Badge variant="warning">Not configured</Badge>
-          )}
+    <>
+      <section id="integrations" className="card-inset scroll-mt-20 overflow-hidden rounded-2xl border border-line bg-panel/80">
+        <div className="p-5 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="logo-glow grid size-10 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white">
+                <Sparkles className="size-[18px]" />
+              </span>
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">Higgsfield MCP</h2>
+                <p className="mt-0.5 text-[13px] text-muted">Cinematic scene generation</p>
+              </div>
+            </div>
+            {status?.configured ? (
+              <Badge variant="success">
+                <span className="size-1.5 rounded-full bg-emerald-400" /> Connected · {status.source === "env" ? "from .env" : "saved"} · {status.hint}
+              </Badge>
+            ) : (
+              <Badge variant="warning"><span className="size-1.5 rounded-full bg-amber-400" /> Not configured</Badge>
+            )}
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-muted">
+            Used to generate the cinematic hook, transition and closing scenes around real product screenshots. Your token is stored server-side only
+            and is never shown to repository code. Without it, those scenes render locally as motion-graphics title cards.
+          </p>
         </div>
-        <CardDescription>
-          Used to generate the cinematic hook, transition and closing scenes. Your token is stored server-side only (never in the browser) and is never
-          shown to repository code. Without it, DemoForge renders those scenes locally as motion-graphics title cards.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <form onSubmit={save} className="grid gap-3">
+
+        <form onSubmit={save} className="space-y-4 p-5 pt-2">
           <label className="grid gap-1.5 text-sm">
             <span className="text-muted">Access token</span>
             <div className="relative">
-              <KeyRound className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-              <Input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste your Higgsfield token" className="pl-9 font-mono" autoComplete="off" />
+              <KeyRound className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" />
+              <Input
+                type={reveal ? "text" : "password"}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Paste your Higgsfield token"
+                className="h-11 pr-10 pl-10 font-mono"
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                onClick={() => setReveal((r) => !r)}
+                aria-label={reveal ? "Hide token" : "Show token"}
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted transition-colors hover:text-fg"
+              >
+                {reveal ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
             </div>
+            <span className="font-mono text-xs text-muted">Stored server-side in data/secrets/</span>
           </label>
           <label className="grid gap-1.5 text-sm">
             <span className="text-muted">MCP server URL (optional)</span>
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={status?.configured ? status.url : "https://mcp.higgsfield.ai/mcp"} className="font-mono" />
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder={status?.configured ? status.url : DEFAULT_URL}
+              className="font-mono"
+            />
           </label>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={!token || busy !== null}>{busy === "save" && <Loader2 className="animate-spin" />} Save token</Button>
-            <Button type="button" variant="secondary" onClick={runTest} disabled={!status?.configured || busy !== null}>
-              {busy === "test" && <Loader2 className="animate-spin" />} Test connection
+            <Button type="submit" disabled={!token || busy !== null}>
+              {busy === "save" ? <Loader2 className="animate-spin" /> : <Save />} Save key
             </Button>
-            {status?.configured && status.source === "settings" && (
-              <Button type="button" variant="destructive" onClick={clear} disabled={busy !== null}><Trash2 /> Remove</Button>
-            )}
+            <Button type="button" variant="secondary" onClick={runTest} disabled={!status?.configured || busy !== null}>
+              {busy === "test" ? <Loader2 className="animate-spin" /> : <Plug />} Test connection
+            </Button>
           </div>
           {message && <p className="text-sm text-muted">{message}</p>}
+
+          {test &&
+            (test.ok ? (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-[13px]">
+                <p className="flex items-center gap-2 text-emerald-300">
+                  <CircleCheck className="size-4 shrink-0" /> Connection OK · <span className="font-mono">{test.tools?.length} tools discovered</span> ·{" "}
+                  <span className="font-mono">{test.ms}ms</span>
+                </p>
+                <p className="mt-2 text-muted">
+                  Video tool: <code className="font-mono text-fg">{test.videoTool ?? "none found"}</code> · Status tool:{" "}
+                  <code className="font-mono text-fg">{test.statusTool ?? "none found"}</code>
+                </p>
+                <p className="mt-2 font-mono text-xs break-words text-muted">{test.tools?.join(", ")}</p>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-200">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-red-300" /> {test.error}
+              </div>
+            ))}
+          <p className="text-xs text-muted">
+            Hackathon note: the token is kept in <code className="font-mono">data/secrets/higgsfield.json</code> (mode 600) on the worker host. It
+            isn&apos;t encrypted at rest, so use a token you can revoke.
+          </p>
         </form>
 
-        {test && (
-          <div className={`rounded-xl border p-4 text-sm ${test.ok ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"}`}>
-            {test.ok ? (
-              <>
-                <p className="flex items-center gap-2 font-medium text-emerald-300"><CheckCircle2 className="size-4" /> Connected — {test.tools?.length} tools available</p>
-                <p className="mt-2 text-muted">Video tool: <code className="font-mono text-fg">{test.videoTool ?? "none found"}</code> · Status tool: <code className="font-mono text-fg">{test.statusTool ?? "none found"}</code></p>
-                <p className="mt-2 font-mono text-xs break-words text-muted">{test.tools?.join(", ")}</p>
-              </>
-            ) : (
-              <p className="text-red-200">{test.error}</p>
-            )}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3.5 text-xs">
+          <div className="flex min-w-0 items-center gap-2 text-muted">
+            <Link2 className="size-3.5 shrink-0" />
+            <span className="truncate font-mono text-fg">{status?.configured ? status.url : DEFAULT_URL}</span>
           </div>
-        )}
-        <p className="text-xs text-muted">
-          Hackathon note: the token is kept in <code className="font-mono">data/secrets/higgsfield.json</code> (mode 600) on the worker host. It isn&apos;t encrypted at rest, so use a token you can revoke.
+          <span className="text-muted">
+            Max scenes per video: <span className="font-mono text-fg">{maxScenes}</span>
+          </span>
+        </div>
+      </section>
+
+      {children}
+
+      <section id="danger" className="card-inset scroll-mt-20 rounded-2xl border border-red-500/20 bg-panel/80 p-5">
+        <div className="flex items-center gap-2">
+          <TriangleAlert className="size-4 text-red-300" />
+          <h2 className="text-base font-semibold tracking-tight text-red-200">Danger zone</h2>
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Removing the Higgsfield key falls back to local motion-graphics title cards for cinematic scenes.
+          {status?.configured && status.source === "env" && " This key comes from .env, so remove HIGGSFIELD_API_KEY there instead."}
         </p>
-      </CardContent>
-    </Card>
+        <Button variant="destructive" className="mt-4" onClick={clear} disabled={!removable || busy !== null}>
+          {busy === "clear" ? <Loader2 className="animate-spin" /> : <Trash2 />} Remove Higgsfield key
+        </Button>
+      </section>
+    </>
   );
 }

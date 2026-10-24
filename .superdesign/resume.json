@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/": {
+      "targetKind": "existing-ui",
+      "projectId": "01953563-4fca-401e-baeb-7ae2a10b7838",
+      "baselineDraftId": null,
+      "activeDraftId": "dae70c2c-4226-448e-bfaa-931ad4330ad1",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "src/app/globals.css",
+        "src/app/layout.tsx",
+        "src/components/site-header.tsx",
+        "src/app/page.tsx",
+        "src/components/landing/import-form.tsx",
+        "src/components/landing/system-status.tsx",
+        "src/components/landing/recent-jobs.tsx",
+        "src/components/generation/status-dot.tsx",
+        "src/components/ui/button.tsx",
+        "src/components/ui/badge.tsx",
+        "src/lib/utils.ts"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "4d587ef2a474af9914d1030e6839c5b393ff8ca62801bdb7c9f60855068a6eaf",
+        "src/app/globals.css": "5c59b05e92aed0ebb2b631104b7ec3a560acc552a4387a63ef92d8615cce3a1f",
+        "src/app/layout.tsx": "a2de7dd1cd5e5e6b057b2f05b8e540f284a4a553834de4ede2245f15030a57f8",
+        "src/components/site-header.tsx": "3cd4325327e31e6429cfebb6ddb65c34528b3ee6ef1c51c4e6fcc56a6c8a041e",
+        "src/app/page.tsx": "504872160ae71d6e9ee529a327c1bc29d4af117c3badfd86d77dd715b3a75cd2",
+        "src/components/landing/import-form.tsx": "43775d7612e92de1b68980ed449504840a578b68faf07aa1b2e84368e7747307",
+        "src/components/landing/system-status.tsx": "8784fb29516dfce766c475c8ba7384320a191bd2eb77b42559b949ecf8ded4a4",
+        "src/components/landing/recent-jobs.tsx": "cc151f724eafc16f0a1fea12e372786aebd2d447f7ce2e60583ccd43f6efe2a3",
+        "src/components/generation/status-dot.tsx": "846e0b104a0efa7f777b417cffb1b6733902392581d216bd780208d97b9edfa8",
+        "src/components/ui/button.tsx": "19ce1aefe6355e679503027a488267c4133f13076651bf4fdcb0be7752acc068",
+        "src/components/ui/badge.tsx": "82eebdd5ce200f9112a9c0678a0c18b9ffc86fe36f82a5f7db5310f7a299c619",
+        "src/lib/utils.ts": "c0adf27efbfa148d5abcf99e860f8e3e6c8fc77a1f99e023c08ef4f12e6ece29"
+      },
+      "components": [],
+      "drafts": {
+        "dae70c2c-4226-448e-bfaa-931ad4330ad1": {
+          "title": "Home — Refined Dark SaaS",
+          "visualDirection": "refined dark SaaS (Linear/Vercel-grade), violet/cyan accents",
+          "parentDraftId": null,
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-24T16:00:00Z"
+    },
+    "/jobs/[jobId]": {
+      "targetKind": "existing-ui",
+      "projectId": "01953563-4fca-401e-baeb-7ae2a10b7838",
+      "sourceTarget": "/",
+      "sourceDraftId": "dae70c2c-4226-448e-bfaa-931ad4330ad1",
+      "activeDraftId": "ad14d37c-3fe4-48d8-b467-0ff3e69edb9a",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "src/app/globals.css",
+        "src/app/jobs/[jobId]/page.tsx",
+        "src/components/generation/job-view.tsx",
+        "src/components/generation/stage-list.tsx",
+        "src/components/generation/status-dot.tsx",
+        "src/components/storyboard/scene-card.tsx",
+        "src/components/storyboard/markdown.tsx",
+        "src/components/ui/card.tsx",
+        "src/components/ui/input.tsx",
+        "src/components/ui/button.tsx",
+        "src/components/ui/badge.tsx"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "4d587ef2a474af9914d1030e6839c5b393ff8ca62801bdb7c9f60855068a6eaf",
+        "src/app/globals.css": "5c59b05e92aed0ebb2b631104b7ec3a560acc552a4387a63ef92d8615cce3a1f",
+        "src/app/jobs/[jobId]/page.tsx": "36cd671da07b1cf6d43d20f721643b4fac202eb6a48dad5a79b02f98f787ef7b",
+        "src/components/generation/job-view.tsx": "7d8f7f9c8e369652d934c7b545d08331f6e854b4638dddc1b2f459ebf1d20eda",
+        "src/components/generation/stage-list.tsx": "2fd65fb0866b9abad48dab5f7d849ae078dd4b474059034e5315ec88b69025a4",
+        "src/components/generation/status-dot.tsx": "846e0b104a0efa7f777b417cffb1b6733902392581d216bd780208d97b9edfa8",
+        "src/components/storyboard/scene-card.tsx": "68edd7ad1211a897dcc8801046d5bbffc5d0090f6691b4321f42dabb818da624",
+        "src/components/storyboard/markdown.tsx": "4cb88acc50298f5fa23095279ff007a47340bf67feb55578adff40b3dca31204",
+        "src/components/ui/card.tsx": "d86c331ed5e897b0b7d2fa33387bdd17c65428c5eca574c1b7b18ce80755bd42",
+        "src/components/ui/input.tsx": "c4c2df78e3bf2382e53983f20b9610a2625223486542a58eb2d11798aa111e9d",
+        "src/components/ui/button.tsx": "19ce1aefe6355e679503027a488267c4133f13076651bf4fdcb0be7752acc068",
+        "src/components/ui/badge.tsx": "82eebdd5ce200f9112a9c0678a0c18b9ffc86fe36f82a5f7db5310f7a299c619"
+      },
+      "components": [],
+      "drafts": {
+        "ad14d37c-3fe4-48d8-b467-0ff3e69edb9a": {
+          "title": "Job — Generation View",
+          "visualDirection": "refined dark SaaS, flow page from Home draft",
+          "parentDraftId": "dae70c2c-4226-448e-bfaa-931ad4330ad1",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-24T16:20:00Z"
+    },
+    "/settings": {
+      "targetKind": "existing-ui",
+      "projectId": "01953563-4fca-401e-baeb-7ae2a10b7838",
+      "sourceTarget": "/",
+      "sourceDraftId": "dae70c2c-4226-448e-bfaa-931ad4330ad1",
+      "activeDraftId": "4fbd205e-600d-4f47-80fd-89b62e910f44",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "src/app/globals.css",
+        "src/app/settings/page.tsx",
+        "src/components/settings/higgsfield-settings.tsx",
+        "src/components/ui/card.tsx",
+        "src/components/ui/input.tsx",
+        "src/components/ui/button.tsx",
+        "src/components/ui/badge.tsx"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "4d587ef2a474af9914d1030e6839c5b393ff8ca62801bdb7c9f60855068a6eaf",
+        "src/app/globals.css": "5c59b05e92aed0ebb2b631104b7ec3a560acc552a4387a63ef92d8615cce3a1f",
+        "src/app/settings/page.tsx": "26008fedb0600f865500f3882bf05f2667cecb7c038e2f4953cb2988643e89d4",
+        "src/components/settings/higgsfield-settings.tsx": "f9ce6491ea0820e5f13563a6c29c8345ccb6ce48405ce7be32cd6414785736de",
+        "src/components/ui/card.tsx": "d86c331ed5e897b0b7d2fa33387bdd17c65428c5eca574c1b7b18ce80755bd42",
+        "src/components/ui/input.tsx": "c4c2df78e3bf2382e53983f20b9610a2625223486542a58eb2d11798aa111e9d",
+        "src/components/ui/button.tsx": "19ce1aefe6355e679503027a488267c4133f13076651bf4fdcb0be7752acc068",
+        "src/components/ui/badge.tsx": "82eebdd5ce200f9112a9c0678a0c18b9ffc86fe36f82a5f7db5310f7a299c619"
+      },
+      "components": [],
+      "drafts": {
+        "4fbd205e-600d-4f47-80fd-89b62e910f44": {
+          "title": "Settings",
+          "visualDirection": "refined dark SaaS, flow page from Home draft",
+          "parentDraftId": "dae70c2c-4226-448e-bfaa-931ad4330ad1",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-24T16:20:00Z"
+    }
+  }
+}

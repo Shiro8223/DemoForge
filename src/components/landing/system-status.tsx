@@ -18,20 +18,20 @@ export function SystemStatus() {
       clearInterval(t);
     };
   }, []);
-  if (!h) return <div className="h-6" />;
+  if (!h) return <div className="h-7" />;
   const item = (ok: boolean, label: string, warn = false) => (
-    <Badge variant={ok ? "success" : warn ? "warning" : "danger"}>
+    <Badge variant={ok ? "success" : warn ? "warning" : "danger"} className="px-3 py-1.5">
       <span className={`size-1.5 rounded-full ${ok ? "bg-emerald-400" : warn ? "bg-amber-400" : "bg-red-400"}`} />
       {label}
     </Badge>
   );
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2">
-      {item(h.worker, h.worker ? "Worker online" : "Worker offline — run npm run worker")}
-      {item(h.ffmpeg, "FFmpeg")}
-      {item(h.claude, h.claude ? "Claude" : "Claude: templates only", true)}
-      <Link href="/settings">{item(h.higgsfield, h.higgsfield ? "Higgsfield" : "Higgsfield: not connected", true)}</Link>
-      {item(h.sandbox === "docker", `Sandbox: ${h.sandbox}`, true)}
+    <div className="flex flex-wrap items-center justify-center gap-2.5">
+      {item(h.worker, h.worker ? "Worker · online" : "Worker · offline — run npm run worker")}
+      {item(h.claude, h.claude ? "Claude · online" : "Claude · templates only", true)}
+      <Link href="/settings">{item(h.higgsfield, h.higgsfield ? "Higgsfield · online" : "Higgsfield · not connected", true)}</Link>
+      {item(h.ffmpeg, h.ffmpeg ? "FFmpeg · ready" : "FFmpeg · missing")}
+      {item(h.sandbox === "docker", `Sandbox · ${h.sandbox}`, true)}
     </div>
   );
 }

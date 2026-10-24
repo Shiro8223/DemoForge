@@ -1,44 +1,110 @@
+import { Box, Info, Plug, Sparkles, TriangleAlert } from "lucide-react";
 import { HiggsfieldSettings } from "@/components/settings/higgsfield-settings";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
+const SECTIONS = [
+  { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "generation", label: "Generation", icon: Sparkles },
+  { id: "sandbox", label: "Sandbox", icon: Box },
+  { id: "danger", label: "Danger zone", icon: Info },
+];
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-line bg-panel-2 px-3.5 py-2.5">
+      <p className="text-[11px] tracking-wide text-muted uppercase">{label}</p>
+      <p className="mt-1 font-mono text-[13px] text-fg">{value}</p>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const claude = !!config.anthropicApiKey;
   return (
-    <main className="mx-auto max-w-3xl space-y-6 px-4 pt-10 pb-24 sm:px-6">
-      <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="mt-1 text-muted">Integrations used by the generation worker.</p>
+    <main className="mx-auto max-w-5xl px-4 pt-10 pb-24 sm:px-6">
+      <div className="mb-10">
+        <h1 className="font-display text-[32px] font-bold tracking-tight">Settings</h1>
+        <p className="mt-2 text-[15px] text-muted">Keys stay on the server — never sent to the browser or to repository processes.</p>
       </div>
-      <HiggsfieldSettings />
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle>Claude</CardTitle>
-            <Badge variant={claude ? "success" : "warning"}>{claude ? `Enabled · ${config.claudeModel}` : "Not configured"}</Badge>
-          </div>
-          <CardDescription>
-            Reads the repository to ground the analysis, then writes summary.md and the storyboard. Set <code className="font-mono">ANTHROPIC_API_KEY</code> in{" "}
-            <code className="font-mono">.env</code> on the server. Without it, DemoForge uses deterministic templates built from static analysis.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle>Sandbox</CardTitle>
-            <Badge variant={config.sandbox === "docker" ? "success" : "warning"}>{config.sandbox}</Badge>
-          </div>
-          <CardDescription>
-            Repositories are untrusted code. <code className="font-mono">DEMOFORGE_SANDBOX=docker</code> installs and runs them in a resource-limited container.
-            Local mode uses a scrubbed environment, a throwaway HOME and timeouts, which is fine for your own repos but not a security boundary.
-          </CardDescription>
-        </CardHeader>
-        <CardContent />
-      </Card>
+      <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
+        <nav className="flex flex-wrap gap-1 text-sm lg:sticky lg:top-20 lg:flex-col lg:self-start">
+          {SECTIONS.map((s, i) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-colors duration-150",
+                i === 0 ? "border-line bg-panel-2 text-fg" : "border-transparent text-muted hover:bg-panel-2 hover:text-fg",
+              )}
+            >
+              <s.icon className={cn("size-4", i === 0 && "text-accent")} /> {s.label}
+            </a>
+          ))}
+        </nav>
+
+        <div className="max-w-[720px] space-y-6">
+          <HiggsfieldSettings maxScenes={config.higgsfield.maxScenes}>
+            <section id="generation" className="card-inset scroll-mt-20 rounded-2xl border border-line bg-panel/80 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-base font-semibold tracking-tight">Claude</h2>
+                <Badge variant={claude ? "success" : "warning"}>
+                  <span className={cn("size-1.5 rounded-full", claude ? "bg-emerald-400" : "bg-amber-400")} />
+                  {claude ? "Configured via ANTHROPIC_API_KEY" : "Not configured"}
+                </Badge>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-muted">Reads the repository to ground the analysis, then writes summary.md and the storyboard.</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Field label="Model" value={config.claudeModel} />
+              </div>
+              <p className="mt-4 text-[13px] leading-relaxed text-muted">
+                Set <code className="font-mono text-fg">ANTHROPIC_API_KEY</code> in <code className="font-mono text-fg">.env</code> on the server. Without
+                it, DemoForge uses deterministic templates built from static analysis, and the output is labelled as a template storyboard.
+              </p>
+            </section>
+
+            <section id="sandbox" className="card-inset scroll-mt-20 rounded-2xl border border-line bg-panel/80 p-5">
+              <h2 className="text-base font-semibold tracking-tight">Sandbox mode</h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted">Repositories are untrusted code. This controls how installs and launches are isolated.</p>
+              <div className="mt-4 inline-flex rounded-xl border border-line bg-panel p-1" role="radiogroup" aria-label="Sandbox mode (read-only)">
+                {(["local", "docker"] as const).map((m) => (
+                  <span
+                    key={m}
+                    role="radio"
+                    aria-checked={config.sandbox === m}
+                    className={cn(
+                      "flex h-9 items-center rounded-lg border px-4 text-[13px] font-medium capitalize",
+                      config.sandbox === m ? "border-line-strong bg-panel-2 text-fg" : "border-transparent text-muted",
+                    )}
+                  >
+                    {m}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                Change it with <code className="font-mono text-fg">DEMOFORGE_SANDBOX=local|docker</code> in <code className="font-mono text-fg">.env</code>.
+              </p>
+              {config.sandbox === "docker" && (
+                <div className="mt-4 flex">
+                  <Field label="Docker image" value={config.dockerImage} />
+                </div>
+              )}
+              {config.sandbox === "local" && (
+                <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-[13px] text-amber-100">
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-300" />
+                  <p>
+                    Local mode runs repository code directly on this machine with a scrubbed environment, a throwaway HOME and timeouts. It is fine for
+                    your own repos but is <span className="font-medium">not a security boundary</span>.
+                  </p>
+                </div>
+              )}
+            </section>
+          </HiggsfieldSettings>
+        </div>
+      </div>
     </main>
   );
 }

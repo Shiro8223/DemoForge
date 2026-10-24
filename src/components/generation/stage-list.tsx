@@ -38,10 +38,10 @@ export function StageList({ stages }: { stages: StageState[] }) {
             <div className="flex items-baseline justify-between gap-3">
               <p className={cn("text-sm font-medium", s.status === "pending" && "text-muted")}>{s.label}</p>
               <span className="shrink-0 font-mono text-[11px] text-muted">
-                {s.status === "skipped" ? "skipped" : elapsed(s, now)}
+                {s.status === "skipped" ? "skipped" : (elapsed(s, now) ?? "—")}
               </span>
             </div>
-            {s.detail && (
+            {s.detail && s.status !== "running" && (
               <p
                 className={cn(
                   "mt-0.5 font-mono text-xs break-words whitespace-pre-wrap",
@@ -51,7 +51,16 @@ export function StageList({ stages }: { stages: StageState[] }) {
                 {s.detail}
               </p>
             )}
-            {s.status === "running" && <div className="shimmer mt-2 h-0.5 rounded-full" />}
+            {s.status === "running" && (
+              <>
+                {s.detail && (
+                  <div className="mt-3 overflow-hidden rounded-xl border border-line bg-black/40 p-3 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap text-fg/80">
+                    › {s.detail}
+                  </div>
+                )}
+                <div className="shimmer relative mt-2 h-1 overflow-hidden rounded-full bg-panel-2" />
+              </>
+            )}
           </div>
         </li>
       ))}
