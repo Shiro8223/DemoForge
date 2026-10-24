@@ -7,9 +7,11 @@ import { geminiAvailable, enrichAnalysis } from "@/lib/agent/gemini";
 import { installDependencies, startApp, type RunningApp } from "@/lib/sandbox";
 import { captureScreenshots, discoverFeatureRoutes } from "@/lib/browser";
 import { templateStoryboard, templateSummary, writeStory } from "@/lib/storyboard";
+import { assertPublicLiveUrl, parseLiveUrl } from "@/lib/validation/live-url";
 import * as higgsfield from "@/lib/higgsfield";
 import * as higgsfieldApi from "@/lib/higgsfield/api";
-import { assembleVideo, probeHasVideo } from "@/lib/video";
+import { assembleVideo, probeDuration, probeHasVideo } from "@/lib/video";
+import { elevenlabsAvailable, synthesize, templateScript, writeScript } from "@/lib/voiceover";
 import { jobDir, JobTracker } from "@/lib/storage/jobs";
 import type { GeneratedScene, Job } from "@/types";
 
@@ -81,13 +83,19 @@ async function fullPipeline(t: JobTracker, opts: RunOptions) {
     await t.stage("analyze", "completed", `${analysis.framework} · ${analysis.packageManager} · ${analysis.analysedBy === "gemini" ? "Gemini" : "static analysis"}`);
 
     // 3-6. Install, start, discover, screenshot ---------------------------------
-    const shots = await runAndCapture(t, repoDir, workspace, h, analysis, logs, (a) => (app = a));
+    // Live-URL mode screenshots the team's running site; their code is never installed or run.
+    const shots = job.liveUrl
+      ? await captureLive(t, job.liveUrl, analysis)
+      : await runAndCapture(t, repoDir, workspace, h, analysis, logs, (a) => (app = a));
     job.outputs.screenshots = shots;
     if (app) await (app as RunningApp).stop();
     app = null;
 
     // 7-8. Summary + storyboard ------------------------------------------------
     await writeStoryStages(t, shots, meta);
+
+    // 8b. ElevenLabs voiceover (never fatal: the video is still made without it) --
+    await voiceoverStage(t);
 
     // 9. Higgsfield ----------------------------------------------------------
     await generateScenes(t);
@@ -167,6 +175,42 @@ async function runAndCapture(
   return shots;
 }
 
+/** Live-URL mode: skip install/start and capture the team's deployed site. */
+async function captureLive(t: JobTracker, liveUrl: string, analysis: Job["outputs"]["analysis"] & object) {
+  const live = parseLiveUrl(liveUrl);
+  await assertPublicLiveUrl(live); // re-checked at run time: DNS may have changed since the request
+  const reason = `live URL mode: using ${live.url}`;
+  await t.stage("install", "skipped", reason);
+  await t.stage("start", "skipped", reason);
+  t.job.outputs.appUrl = live.url;
+
+  await t.stage("discover", "running", live.url);
+  let routes = [live.path, ...analysis.routes.filter((r) => r !== live.path)];
+  try {
+    const found = await discoverFeatureRoutes(live.url, analysis.routes);
+    // discoverFeatureRoutes leads with "/"; in live mode the given page leads instead.
+    routes = [...new Set([live.path, ...found.filter((r) => r !== "/" || live.path === "/")])];
+    analysis.routes = routes.slice(0, 12);
+    await t.stage("discover", "completed", `${routes.length} candidate route(s): ${routes.slice(0, 5).join(", ")}`);
+  } catch (e) {
+    await t.stage("discover", "failed", `The live site didn't load in the browser: ${errMsg(e)}`);
+  }
+
+  await t.stage("screenshots", "running");
+  const { shots, failures } = await captureScreenshots({
+    baseUrl: live.origin,
+    routes,
+    outDir: path.join(jobDir(t.job.id), "screenshots"),
+    relPrefix: "screenshots",
+  });
+  if (failures.length) await t.notice(`Some pages were skipped: ${failures.slice(0, 4).join("; ")}`);
+  if (!shots.length) {
+    await t.stage("screenshots", "failed", "No page on the live site rendered usable content");
+    await t.notice("No real screenshots were captured from the live site. The video uses title scenes only.");
+  } else await t.stage("screenshots", "completed", `${shots.length} page(s) from ${live.origin}: ${shots.map((s) => s.route).join(", ")}`);
+  return shots;
+}
+
 async function writeStoryStages(t: JobTracker, shots: NonNullable<Job["outputs"]["screenshots"]>, meta: RepoMeta | null) {
   const job = t.job;
   const out = jobDir(job.id);
@@ -189,6 +233,33 @@ async function writeStoryStages(t: JobTracker, shots: NonNullable<Job["outputs"]
   await fs.writeFile(path.join(out, "storyboard.json"), JSON.stringify(story.storyboard, null, 2));
   job.outputs.storyboard = story.storyboard;
   await t.stage("storyboard", "completed", `${story.storyboard.scenes.length} scenes · ${story.storyboard.duration}s · validated`);
+}
+
+async function voiceoverStage(t: JobTracker) {
+  const job = t.job;
+  if (!elevenlabsAvailable()) {
+    await t.stage("voiceover", "skipped", "ELEVENLABS_API_KEY is not set");
+    return;
+  }
+  await t.stage("voiceover", "running", "Writing the script");
+  try {
+    const script = await writeScript(job.outputs.storyboard!, job.outputs.analysis!).catch(async (e) => {
+      await t.notice(`Gemini voiceover script failed, used the on-screen text instead: ${errMsg(e)}`);
+      return { text: templateScript(job.outputs.storyboard!, job.outputs.analysis!), authoredBy: "template" as const };
+    });
+    await t.stage("voiceover", "running", "ElevenLabs is reading the script");
+    const rel = "voiceover.mp3";
+    const r = await synthesize(script.text, path.join(jobDir(job.id), rel));
+    const secs = await probeDuration(path.join(jobDir(job.id), rel)).catch(() => 0);
+    job.outputs.voiceover = rel;
+    job.outputs.narration = { text: script.text, authoredBy: script.authoredBy, voiceId: r.voiceId, model: r.model };
+    await fs.writeFile(path.join(jobDir(job.id), "voiceover.txt"), script.text);
+    await t.save();
+    await t.stage("voiceover", "completed", `${script.text.split(" ").length} words · ${secs.toFixed(1)}s · ${script.authoredBy === "gemini" ? "script by Gemini" : "script from on-screen text"}`);
+  } catch (e) {
+    await t.stage("voiceover", "failed", errMsg(e));
+    await t.notice(`No voiceover: ${errMsg(e)} The video is made with music only.`);
+  }
 }
 
 async function generateScenes(t: JobTracker, onlySceneId?: string) {
@@ -293,6 +364,7 @@ async function assembleStage(t: JobTracker) {
     output: path.join(out, "final-demo.mp4"),
     poster: path.join(out, "poster.jpg"),
     repoLabel: `github.com/${job.owner}/${job.repo}`,
+    voiceover: job.outputs.voiceover ? path.join(out, job.outputs.voiceover) : null,
     onProgress: (m) => t.stage("assemble", "running", m),
   });
   await fs.rm(path.join(out, "render"), { recursive: true, force: true });

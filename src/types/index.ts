@@ -11,6 +11,7 @@ export const STAGES = [
   { id: "screenshots", label: "Capture screenshots" },
   { id: "summary", label: "Write summary" },
   { id: "storyboard", label: "Build storyboard" },
+  { id: "voiceover", label: "Record voiceover" },
   { id: "generate", label: "Generate cinematic scenes" },
   { id: "assemble", label: "Assemble video" },
 ] as const;
@@ -58,6 +59,9 @@ export interface JobOutputs {
   /** Who produced the summary/storyboard: Gemini (or Claude, for older jobs) or the deterministic fallback. */
   authoredBy?: "gemini" | "claude" | "template";
   appUrl?: string;
+  /** ElevenLabs narration (relative path) and the script it reads. */
+  voiceover?: string;
+  narration?: { text: string; authoredBy: "gemini" | "template"; voiceId: string; model: string };
 }
 
 export interface Job {
@@ -66,6 +70,8 @@ export interface Job {
   repoUrl: string;
   owner: string;
   repo: string;
+  /** Live-URL mode: screenshot this running site instead of installing/starting the repo. */
+  liveUrl?: string;
   status: JobStatus;
   currentStage?: StageId;
   stages: StageState[];

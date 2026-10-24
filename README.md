@@ -6,7 +6,7 @@ DemoForge turns a public GitHub repository into a 20–30 second vertical (9:16)
 
 ```
 GitHub URL → clone → analyse (Gemini) → install → launch → discover routes → Playwright screenshots
-           → summary.md + storyboard.json (validated) → Higgsfield MCP scenes → FFmpeg → final-demo.mp4
+           → summary.md + storyboard.json (validated) → ElevenLabs voiceover → Higgsfield scenes → FFmpeg → final-demo.mp4
 ```
 
 ## Quick start
@@ -28,7 +28,12 @@ To run one generation without the web UI:
 ```bash
 npm run once -- https://github.com/owner/repo
 npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no cloning
+npm run once -- https://github.com/owner/repo --live https://their-app.vercel.app   # film the running site
 ```
+
+### Live-URL mode
+
+Already deployed? Paste the live site URL next to the repo. DemoForge still clones the repo to read its README and routes, but **never installs or runs its code**: it skips Install and Start and screenshots the running site instead. This works for any stack (Python, monorepos, apps that need secrets) and is the reliable option for other teams' projects. Localhost and private-network addresses are refused unless `DEMOFORGE_ALLOW_PRIVATE_URLS=1`.
 
 ## Environment variables
 
@@ -37,6 +42,9 @@ npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no clo
 | `GEMINI_API_KEY` | Gemini repository analysis, `summary.md` and storyboard. Without it, deterministic templates are used and labelled as such. |
 | `GEMINI_MODEL` | Defaults to `gemini-3.5-flash`. |
 | `GEMINI_FALLBACK_MODEL` | Optional. Retried when the main model is rate-limited or returns a server error, e.g. `gemini-3.5-flash-lite`. |
+| `ELEVENLABS_API_KEY` | Turns on the narrated voiceover. Gemini writes a script sized to the video (≈2.4 words/s), ElevenLabs reads it, and the music is ducked underneath. Empty = music only. |
+| `ELEVENLABS_VOICE_ID` / `ELEVENLABS_MODEL` | Voice (default George, `JBFqnCBsd6RMkjVDRZzb`) and model (default `eleven_multilingual_v2`). |
+| `DEMOFORGE_ALLOW_PRIVATE_URLS` | Live-URL mode blocks localhost and private-network addresses by default. Set to `1` only when DemoForge runs on your own machine and a team's app is on the local Wi-Fi. |
 | `HF_CREDENTIALS` | **Recommended.** Higgsfield developer API key pair from console.higgsfield.ai, as `KEY_ID:KEY_SECRET`. When set, it is used instead of MCP. Check it for free with `npx tsx scripts/check-higgsfield.ts`. |
 | `HIGGSFIELD_MODEL` | Text-to-video model path for the developer API. Default `kling-video/v3.0/std/text-to-video`; Seedance 2.5 is `bytedance/seedance-2.5/text-to-video`. |
 | `HIGGSFIELD_API_BASE` | Defaults to `https://api.higgsfield.ai`. |

@@ -21,7 +21,7 @@ export function freshStages(): StageState[] {
   return STAGES.map((s) => ({ id: s.id, label: s.label, status: "pending" as StageStatus }));
 }
 
-export async function createJob(input: { repoUrl: string; owner: string; repo: string }): Promise<Job> {
+export async function createJob(input: { repoUrl: string; owner: string; repo: string; liveUrl?: string }): Promise<Job> {
   const now = new Date().toISOString();
   const job: Job = {
     id: makeId(),
@@ -29,6 +29,7 @@ export async function createJob(input: { repoUrl: string; owner: string; repo: s
     repoUrl: input.repoUrl,
     owner: input.owner,
     repo: input.repo,
+    ...(input.liveUrl ? { liveUrl: input.liveUrl } : {}),
     status: "pending",
     stages: freshStages(),
     notices: [],
@@ -80,7 +81,14 @@ export class JobTracker {
   constructor(public job: Job) {}
 
   async stage(id: StageId, status: StageStatus, detail?: string) {
-    const s = this.job.stages.find((x) => x.id === id)!;
+    let s = this.job.stages.find((x) => x.id === id);
+    if (!s) {
+      // Jobs created before this stage existed: add it in pipeline order.
+      s = { id, label: STAGES.find((x) => x.id === id)?.label ?? id, status: "pending" };
+      const order = STAGES.map((x) => x.id) as StageId[];
+      this.job.stages.push(s);
+      this.job.stages.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    }
     s.status = status;
     if (detail !== undefined) s.detail = detail;
     const now = new Date().toISOString();

@@ -6,7 +6,11 @@ export const repoUrlSchema = z
   .min(1, "Paste a GitHub repository URL")
   .max(300);
 
-export const generateRequestSchema = z.object({ repoUrl: repoUrlSchema });
+export const generateRequestSchema = z.object({
+  repoUrl: repoUrlSchema,
+  /** Optional: the team's running site. When set, DemoForge screenshots it instead of installing and starting the repo. */
+  liveUrl: z.string().trim().max(500).optional(),
+});
 
 export const projectAnalysisSchema = z.object({
   name: z.string(),
