@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { execa } from "execa";
 import { config } from "@/lib/config";
 import { getCredentials } from "@/lib/higgsfield";
+import { apiConfigured } from "@/lib/higgsfield/api";
 import { workerAlive } from "@/lib/storage/jobs";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ export async function GET() {
   return NextResponse.json({
     worker: await workerAlive(),
     gemini: !!config.gemini.apiKey,
-    higgsfield: !!(await getCredentials()),
+    higgsfield: apiConfigured() || !!(await getCredentials()),
     ffmpeg,
     sandbox: config.sandbox,
   });

@@ -15,7 +15,7 @@ Requirements: Node 20+, FFmpeg/ffprobe on `PATH`, and a Chromium for Playwright 
 
 ```bash
 npm install
-cp .env.example .env          # add GEMINI_API_KEY (and optionally HIGGSFIELD_API_KEY)
+cp .env.example .env          # add GEMINI_API_KEY and HF_CREDENTIALS (Higgsfield KEY_ID:KEY_SECRET)
 npm run dev:all               # web on :3000 + generation worker
 ```
 
@@ -35,8 +35,11 @@ npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no clo
 | `GEMINI_API_KEY` | Gemini repository analysis, `summary.md` and storyboard. Without it, deterministic templates are used and labelled as such. |
 | `GEMINI_MODEL` | Defaults to `gemini-3.5-flash`. |
 | `GEMINI_FALLBACK_MODEL` | Optional. Retried when the main model is rate-limited or returns a server error, e.g. `gemini-3.5-flash-lite`. |
-| `HIGGSFIELD_MCP_URL` | Defaults to `https://mcp.higgsfield.ai/mcp`. |
-| `HIGGSFIELD_API_KEY` | Bearer token for the MCP server. Can also be set from **/settings** (stored server-side in `data/secrets/`). |
+| `HF_CREDENTIALS` | **Recommended.** Higgsfield developer API key pair from console.higgsfield.ai, as `KEY_ID:KEY_SECRET`. When set, it is used instead of MCP. Check it for free with `npx tsx scripts/check-higgsfield.ts`. |
+| `HIGGSFIELD_MODEL` | Text-to-video model path for the developer API. Default `kling-video/v3.0/std/text-to-video`; Seedance 2.5 is `bytedance/seedance-2.5/text-to-video`. |
+| `HIGGSFIELD_API_BASE` | Defaults to `https://api.higgsfield.ai`. |
+| `HIGGSFIELD_MCP_URL` | MCP fallback only. Defaults to `https://mcp.higgsfield.ai/mcp`. |
+| `HIGGSFIELD_API_KEY` | MCP fallback only: bearer token for the MCP server (the hosted server expects OAuth, so prefer `HF_CREDENTIALS`). Can also be set from **/settings** (stored server-side in `data/secrets/`). |
 | `HIGGSFIELD_VIDEO_TOOL` / `HIGGSFIELD_STATUS_TOOL` | Pin tool names if auto-discovery picks the wrong ones. |
 | `HIGGSFIELD_MAX_SCENES` | Cap Higgsfield calls per video (credits). Default 2. |
 | `DEMOFORGE_SANDBOX` | `local` (default) or `docker`. |
@@ -81,6 +84,10 @@ Jobs live in `outputs/jobs/<id>/` (`job.json`, `project-analysis.json`, `summary
 
 ### Higgsfield integration
 
+**Developer API (default when `HF_CREDENTIALS` is set).** `src/lib/higgsfield/api.ts` sends each generated scene to `POST {HIGGSFIELD_API_BASE}/{HIGGSFIELD_MODEL}` with `Authorization: Key KEY_ID:KEY_SECRET`, polls `/requests/{id}/status` and downloads `video.url`. Clips are requested at 4–15 s (the models' minimum) and trimmed to the scene. The key is never sent to the download host or to repo code.
+
+**MCP fallback.** Used only when `HF_CREDENTIALS` is empty.
+
 Higgsfield's hosted MCP tool catalogue varies, so DemoForge does **not** hard-code tool names. On each run it lists the server's tools and:
 
 1. Picks a text-to-video tool (or `HIGGSFIELD_VIDEO_TOOL`) and a job-status tool (or `HIGGSFIELD_STATUS_TOOL`).
@@ -108,7 +115,7 @@ npm run typecheck && npm run lint && npm test
 npm run once -- --local tests/fixtures/launchpad
 ```
 
-`npm test` covers URL validation, path traversal, storyboard validation and normalisation, README parsing, Higgsfield tool selection and argument building. It also runs an integration test of the MCP client against a local **mock** MCP server (test-only) covering submit → poll → download.
+`npm test` covers URL validation, path traversal, storyboard validation and normalisation, README parsing, Higgsfield tool selection and argument building. It also runs integration tests of both Higgsfield clients (developer API and MCP) against local **mock** servers (test-only) covering submit → poll → download.
 
 ## Status / known limitations
 

@@ -8,6 +8,7 @@ import { installDependencies, startApp, type RunningApp } from "@/lib/sandbox";
 import { captureScreenshots, discoverFeatureRoutes } from "@/lib/browser";
 import { templateStoryboard, templateSummary, writeStory } from "@/lib/storyboard";
 import * as higgsfield from "@/lib/higgsfield";
+import * as higgsfieldApi from "@/lib/higgsfield/api";
 import { assembleVideo, probeHasVideo } from "@/lib/video";
 import { jobDir, JobTracker } from "@/lib/storage/jobs";
 import type { GeneratedScene, Job } from "@/types";
@@ -197,6 +198,38 @@ async function generateScenes(t: JobTracker, onlySceneId?: string) {
   const targets = sb.scenes
     .filter((s) => s.visualType === "generated" && (!onlySceneId || s.id === onlySceneId))
     .slice(0, onlySceneId ? 1 : Math.max(0, config.higgsfield.maxScenes));
+
+  if (higgsfieldApi.apiConfigured() && targets.length) {
+    // Option B: Higgsfield developer API (HF_CREDENTIALS + HIGGSFIELD_MODEL). Preferred over MCP when set.
+    await t.stage("generate", "running", `Higgsfield API (${higgsfieldApi.apiHost()})`);
+    const clipsDir = path.join(jobDir(job.id), "scenes");
+    await fs.mkdir(clipsDir, { recursive: true });
+    const existing = (job.outputs.generatedScenes ?? []).filter((g) => !targets.some((s) => s.id === g.sceneId));
+    const made: GeneratedScene[] = [];
+    const errors: string[] = [];
+    for (const s of targets) {
+      const rel = `scenes/${s.id}.mp4`;
+      try {
+        const r = await higgsfieldApi.generateClipViaApi({
+          prompt: `${s.videoPrompt}. Style: ${sb.visualStyle}. Vertical 9:16, no on-screen text.`,
+          duration: s.duration,
+          aspectRatio: "9:16",
+          outFile: path.join(jobDir(job.id), rel),
+          onProgress: (m) => void t.stage("generate", "running", `${s.id}: ${m}`),
+        });
+        if (!(await probeHasVideo(path.join(jobDir(job.id), rel)))) throw new Error("Downloaded file is not a valid video");
+        made.push({ sceneId: s.id, file: rel, source: "higgsfield", tool: r.tool, prompt: s.videoPrompt });
+      } catch (e) {
+        errors.push(`${s.id}: ${errMsg(e)}`);
+      }
+    }
+    job.outputs.generatedScenes = [...existing, ...made];
+    await t.save();
+    if (errors.length) await t.notice(`Higgsfield generation problems — affected scenes fall back to local title cards: ${errors.join(" | ")}`);
+    if (!made.length) await t.stage("generate", "failed", errors[0] ?? "No scenes generated");
+    else await t.stage("generate", "completed", `${made.length} Higgsfield scene(s) via ${made[0].tool}`);
+    return;
+  }
 
   if (!creds) {
     await t.stage("generate", "skipped", "Higgsfield is not configured. Generated scenes were rendered locally as motion title cards.");
