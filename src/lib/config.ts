@@ -24,6 +24,11 @@ export const config = {
     model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
     fallbackModel: process.env.GEMINI_FALLBACK_MODEL || "",
   },
+  github: {
+    // OAuth App for "Sign in with GitHub" (private repos). Callback: <app URL>/api/auth/github/callback
+    clientId: process.env.GITHUB_CLIENT_ID || "",
+    clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
+  },
   higgsfield: {
     url: process.env.HIGGSFIELD_MCP_URL || "https://mcp.higgsfield.ai/mcp",
     apiKey: process.env.HIGGSFIELD_API_KEY || "",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { parseGitHubUrl } from "@/lib/github";
+import { checkRepoAccess, parseGitHubUrl } from "@/lib/github";
+import { getAccount } from "@/lib/github/auth";
 import { createJob, listJobs } from "@/lib/storage/jobs";
 import { generateRequestSchema } from "@/lib/validation/schemas";
 
@@ -21,6 +22,19 @@ export async function POST(req: Request) {
   const active = (await listJobs(100)).filter((j) => j.status === "pending" || j.status === "running");
   if (active.length >= MAX_QUEUED)
     return NextResponse.json({ error: "The generation queue is full. Try again in a few minutes." }, { status: 429 });
+
+  if ((await checkRepoAccess(parsed.owner, parsed.repo)) === "missing") {
+    const account = await getAccount();
+    return NextResponse.json(
+      {
+        error: account
+          ? `${parsed.owner}/${parsed.repo} was not found, or @${account.login} doesn't have access to it.`
+          : `${parsed.owner}/${parsed.repo} was not found. If it's private, sign in with GitHub first.`,
+        needsSignIn: !account,
+      },
+      { status: 404 },
+    );
+  }
 
   const job = await createJob({ repoUrl: parsed.webUrl, owner: parsed.owner, repo: parsed.repo });
   return NextResponse.json({ jobId: job.id }, { status: 201 });

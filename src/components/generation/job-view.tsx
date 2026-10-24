@@ -86,7 +86,7 @@ export function JobView({ jobId }: { jobId: string }) {
   if (missing)
     return (
       <div className="mx-auto max-w-xl px-4 py-24 text-center">
-        <p className="font-display text-2xl font-bold">Job not found</p>
+        <p className="font-display text-3xl">Job not found</p>
         <Button asChild variant="secondary" className="mt-6"><Link href="/">Back home</Link></Button>
       </div>
     );
@@ -120,7 +120,7 @@ export function JobView({ jobId }: { jobId: string }) {
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-            <h1 className="truncate font-display text-2xl font-bold tracking-tight sm:text-[28px]">{a?.name ?? job.repo}</h1>
+            <h1 className="truncate font-display text-3xl sm:text-[40px] sm:leading-none">{a?.name ?? job.repo}</h1>
             {job.status === "completed" ? (
               <Badge variant="success"><Check /> Completed</Badge>
             ) : job.status === "failed" ? (

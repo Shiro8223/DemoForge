@@ -71,8 +71,9 @@ async function readJson(res: Response) {
 }
 
 function explain(status: number, body: Record<string, unknown>) {
+  // Higgsfield answers 403 {"detail":"not_enough_credits"} for a valid key on an empty balance.
+  if (status === 402 || /credit/i.test(String(body.detail ?? ""))) return "Higgsfield account is out of credits. Top up at console.higgsfield.ai.";
   if (status === 401 || status === 403) return "Higgsfield rejected the credentials (check HF_CREDENTIALS = KEY_ID:KEY_SECRET).";
-  if (status === 402) return "Higgsfield account is out of credits.";
   if (status === 404) return "Higgsfield model not found (check HIGGSFIELD_MODEL against the console Models Gallery).";
   if (status === 400 || status === 429) return `Higgsfield refused the request (${status}): ${JSON.stringify(body).slice(0, 300)}. Too many requests at once also returns 400.`;
   return `Higgsfield error ${status}: ${JSON.stringify(body).slice(0, 300)}`;

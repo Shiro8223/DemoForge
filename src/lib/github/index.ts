@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { simpleGit } from "simple-git";
 import { config } from "@/lib/config";
+import { getGitHubToken } from "@/lib/github/auth";
 
 export interface ParsedRepo {
   owner: string;
@@ -55,15 +56,30 @@ export interface RepoMeta {
   language: string | null;
 }
 
+async function repoApi(owner: string, repo: string) {
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "DemoForge" };
+  const token = await getGitHubToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers, signal: AbortSignal.timeout(10_000) });
+}
+
+/**
+ * Up-front check so a private or missing repo fails at submit time, not inside the worker.
+ * GitHub answers 404 for private repos the caller cannot see. Network trouble is "unknown".
+ */
+export async function checkRepoAccess(owner: string, repo: string): Promise<"ok" | "missing" | "unknown"> {
+  try {
+    const res = await repoApi(owner, repo);
+    return res.ok ? "ok" : res.status === 404 ? "missing" : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 /** Best-effort GitHub API metadata. Failure is non-fatal. */
 export async function fetchRepoMeta(owner: string, repo: string): Promise<RepoMeta | null> {
   try {
-    const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "DemoForge" };
-    if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers,
-      signal: AbortSignal.timeout(10_000),
-    });
+    const res = await repoApi(owner, repo);
     if (!res.ok) return null;
     const j = (await res.json()) as Record<string, unknown>;
     return {
@@ -109,6 +125,17 @@ export async function cloneRepository(parsed: ParsedRepo, workspace: string): Pr
     ...(process.env.https_proxy ? { https_proxy: process.env.https_proxy } : {}),
     ...(process.env.GIT_SSL_CAINFO ? { GIT_SSL_CAINFO: process.env.GIT_SSL_CAINFO } : {}),
   };
+  // Private repos: hand git the token as an auth header via env config, so it never appears
+  // in the clone URL, argv, or the cloned repo's .git/config.
+  const token = await getGitHubToken();
+  if (token) {
+    const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
+    Object.assign(env, {
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader",
+      GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}`,
+    });
+  }
   // simple-git blocks custom env vars and core.hooksPath by default; both are ours and
   // only tighten git (hooksPath is set to disable hooks, see below).
   const git = simpleGit({
@@ -118,16 +145,27 @@ export async function cloneRepository(parsed: ParsedRepo, workspace: string): Pr
   }).env(env);
   // core.symlinks=false: symlinks are checked out as plain files, so nothing we
   // later read for analysis can point outside the workspace.
-  await git.clone(parsed.cloneUrl, target, [
-    "--depth",
-    "1",
-    "--single-branch",
-    "--no-tags",
-    "-c",
-    "core.symlinks=false",
-    "-c",
-    "core.hooksPath=/dev/null",
-  ]);
+  try {
+    await git.clone(parsed.cloneUrl, target, [
+      "--depth",
+      "1",
+      "--single-branch",
+      "--no-tags",
+      "-c",
+      "core.symlinks=false",
+      "-c",
+      "core.hooksPath=/dev/null",
+    ]);
+  } catch (e) {
+    // With prompts disabled, a private repo surfaces as an auth or "not found" error.
+    if (/could not read Username|Authentication failed|Repository not found|returned error: 40[134]/i.test((e as Error).message))
+      throw new Error(
+        token
+          ? `GitHub denied access to ${parsed.owner}/${parsed.repo}. Check that the signed-in account can see it.`
+          : `${parsed.owner}/${parsed.repo} is private or does not exist. Sign in with GitHub to use private repositories.`,
+      );
+    throw e;
+  }
 
   const size = await dirSizeMb(target);
   if (size > config.limits.maxRepoSizeMb)

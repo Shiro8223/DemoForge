@@ -32,6 +32,8 @@ function Show-Status {
 
 switch ($Action) {
   "install" {
+    # A running server would keep serving the old build, and the rebuild breaks it underneath.
+    Stop-DemoForge
     Push-Location $Root
     # Windows PowerShell turns native stderr into errors, which "Stop" would make fatal.
     $ErrorActionPreference = "Continue"

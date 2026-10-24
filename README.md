@@ -44,6 +44,7 @@ npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no clo
 | `HIGGSFIELD_API_KEY` | MCP fallback only: bearer token for the MCP server (the hosted server expects OAuth, so prefer `HF_CREDENTIALS`). Can also be set from **/settings** (stored server-side in `data/secrets/`). |
 | `HIGGSFIELD_VIDEO_TOOL` / `HIGGSFIELD_STATUS_TOOL` | Pin tool names if auto-discovery picks the wrong ones. |
 | `HIGGSFIELD_MAX_SCENES` | Cap Higgsfield calls per video (credits). Default 2. |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | Optional. GitHub OAuth App enabling **Sign in with GitHub** for private repos. Create it at github.com/settings/developers with callback URL `http://localhost:3000/api/auth/github/callback`. The token is stored in `data/secrets/github.json` and only used to clone and read repo metadata. |
 | `DEMOFORGE_SANDBOX` | `local` (default) or `docker`. |
 | `DEMOFORGE_DOCKER_IMAGE` | Image for docker mode. Default `node:22-bookworm`. |
 | `MUSIC_PATH` | Optional royalty-free track. Otherwise a procedural ambient bed is synthesised. |

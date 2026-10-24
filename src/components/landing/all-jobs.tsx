@@ -19,7 +19,7 @@ export function AllJobs() {
         <span className="mb-4 grid size-11 place-items-center rounded-xl border border-line bg-panel-2 text-accent">
           <Film className="size-[18px]" />
         </span>
-        <h2 className="text-[15px] font-semibold">No jobs yet</h2>
+        <h2 className="text-lg">No jobs yet</h2>
         <p className="mt-1.5 mb-6 text-[13px] text-muted">Paste a GitHub repo to generate your first demo.</p>
         <Link
           href="/#import"

@@ -11,7 +11,7 @@
   --color-accent: #8b5cf6;
   --color-accent-2: #22d3ee;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-inter-display), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-anton), var(--font-inter-display), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 }
 
@@ -25,6 +25,21 @@ body {
   color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Every heading gets the poster treatment. Anton has a single (already heavy) weight,
+   so faux-bold from font-bold/font-semibold is disabled instead of smearing the glyphs. */
+@layer base {
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-synthesis: none;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
 }
 
 input::placeholder,
