@@ -81,7 +81,14 @@ export class JobTracker {
   constructor(public job: Job) {}
 
   async stage(id: StageId, status: StageStatus, detail?: string) {
-    const s = this.job.stages.find((x) => x.id === id)!;
+    let s = this.job.stages.find((x) => x.id === id);
+    if (!s) {
+      // Jobs created before this stage existed: add it in pipeline order.
+      s = { id, label: STAGES.find((x) => x.id === id)?.label ?? id, status: "pending" };
+      const order = STAGES.map((x) => x.id) as StageId[];
+      this.job.stages.push(s);
+      this.job.stages.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    }
     s.status = status;
     if (detail !== undefined) s.detail = detail;
     const now = new Date().toISOString();

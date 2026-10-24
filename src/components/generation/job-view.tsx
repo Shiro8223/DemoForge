@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, Check, ChevronRight, Clock, Download, ExternalLink, Globe, Info, Link2, Loader2, RefreshCw, Timer } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, Clock, Download, ExternalLink, Globe, Info, Link2, Loader2, Mic, RefreshCw, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -289,6 +289,25 @@ export function JobView({ jobId }: { jobId: string }) {
                 <div className="flex flex-wrap gap-1.5">
                   {a.routes.map((r) => <code key={r} className="rounded-md border border-line bg-panel-2 px-2 py-0.5 font-mono text-xs">{r}</code>)}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {job.outputs.narration && (
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2"><Mic className="size-4 text-violet-300" /> Voiceover</CardTitle>
+                <span className="text-xs text-muted">
+                  ElevenLabs · {job.outputs.narration.authoredBy === "gemini" ? "script by Gemini" : "script from on-screen text"}
+                </span>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm leading-relaxed text-fg/90">&ldquo;{job.outputs.narration.text}&rdquo;</p>
+                {job.outputs.voiceover && (
+                  <audio controls preload="none" src={file(job.outputs.voiceover)} className="w-full">
+                    <track kind="captions" />
+                  </audio>
+                )}
               </CardContent>
             </Card>
           )}

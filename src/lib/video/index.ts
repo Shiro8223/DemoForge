@@ -6,7 +6,8 @@ import type { Scene, Storyboard } from "@/lib/validation/schemas";
 
 /**
  * FFmpeg assembly. Every scene is rendered to a normalised 1080x1920 / 30fps / yuv420p
- * clip, then clips are joined with xfade transitions and mixed with music.
+ * clip, then clips are joined with xfade transitions and mixed with music (and an ElevenLabs
+ * voiceover when one was recorded, with the music ducked underneath).
  * All arguments are passed as argv (never through a shell) and overlay text is
  * written to files consumed via drawtext's `textfile=`, so no escaping issues.
  */
@@ -201,8 +202,15 @@ export interface AssembleInput {
   output: string;
   poster: string;
   repoLabel: string;
+  /** Absolute path of an ElevenLabs narration (mp3). When set, music is ducked under it. */
+  voiceover?: string | null;
   onProgress?: (msg: string) => Promise<void> | void;
 }
+
+/** Narration starts after the opening beat and must end before the final fade. */
+const VOICE_DELAY = 0.7;
+const VOICE_TAIL = 1.0;
+const MAX_TEMPO = 1.2;
 
 export async function assembleVideo(input: AssembleInput): Promise<{ duration: number }> {
   const { storyboard, workDir } = input;
@@ -249,16 +257,34 @@ export async function assembleVideo(input: AssembleInput): Promise<{ duration: n
     config.musicPath && (await fs.access(config.musicPath).then(() => true, () => false))
       ? ["-stream_loop", "-1", "-i", config.musicPath]
       : synthMusicInput(total + 1);
-  parts.push(
+  const voice = input.voiceover && (await fs.access(input.voiceover).then(() => true, () => false)) ? input.voiceover : null;
+  const musicChain =
     `[${musicIdx}:a]atrim=0:${total.toFixed(3)},asetpts=PTS-STARTPTS,lowpass=f=5000,` +
-      `afade=t=in:st=0:d=1,afade=t=out:st=${(total - 1.5).toFixed(3)}:d=1.5,volume=0.8,aformat=sample_rates=48000:channel_layouts=stereo[aout]`,
-  );
+    `afade=t=in:st=0:d=1,afade=t=out:st=${(total - 1.5).toFixed(3)}:d=1.5,` +
+    // Duck the music under narration so every word is clear.
+    `volume=${voice ? "0.28" : "0.8"},aformat=sample_rates=48000:channel_layouts=stereo`;
+  if (!voice) parts.push(`${musicChain}[aout]`);
+  else {
+    // Speed narration up slightly (max 1.2×) if it would overrun; anything still longer is faded out at the end.
+    const room = Math.max(1, total - VOICE_DELAY - VOICE_TAIL);
+    const voiceDur = await probeDuration(voice).catch(() => room);
+    const tempo = Math.min(MAX_TEMPO, Math.max(1, voiceDur / room));
+    const delayMs = Math.round(VOICE_DELAY * 1000);
+    parts.push(`${musicChain}[bg]`);
+    parts.push(
+      `[${musicIdx + 1}:a]aformat=sample_rates=48000:channel_layouts=stereo,atempo=${tempo.toFixed(3)},` +
+        `adelay=${delayMs}|${delayMs},apad,atrim=0:${total.toFixed(3)},` +
+        `afade=t=out:st=${Math.max(0, total - 0.8).toFixed(3)}:d=0.8,volume=1.15[vo]`,
+    );
+    parts.push(`[bg][vo]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95,aformat=sample_rates=48000:channel_layouts=stereo[aout]`);
+  }
 
   await input.onProgress?.("Joining scenes and mixing audio");
   await ffmpeg(
     [
       ...clips.flatMap((c) => ["-i", c]),
       ...music,
+      ...(voice ? ["-i", voice] : []),
       "-filter_complex", parts.join(";"),
       "-map", "[vout]", "-map", "[aout]",
       ...ENCODE, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest",

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
-type Health = { worker: boolean; gemini: boolean; higgsfield: boolean; ffmpeg: boolean; sandbox: string };
+type Health = { worker: boolean; gemini: boolean; higgsfield: boolean; elevenlabs?: boolean; ffmpeg: boolean; sandbox: string };
 
 export function SystemStatus() {
   const [h, setH] = useState<Health | null>(null);
@@ -30,6 +30,7 @@ export function SystemStatus() {
       {item(h.worker, h.worker ? "Worker · online" : "Worker · offline — run npm run worker")}
       {item(h.gemini, h.gemini ? "Gemini · online" : "Gemini · templates only", true)}
       <Link href="/settings">{item(h.higgsfield, h.higgsfield ? "Higgsfield · online" : "Higgsfield · not connected", true)}</Link>
+      {item(!!h.elevenlabs, h.elevenlabs ? "ElevenLabs · voiceover on" : "ElevenLabs · no voiceover", true)}
       {item(h.ffmpeg, h.ffmpeg ? "FFmpeg · ready" : "FFmpeg · missing")}
       {item(h.sandbox === "docker", `Sandbox · ${h.sandbox}`, true)}
     </div>

@@ -11,6 +11,8 @@ const TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".md": "text/markdown; charset=utf-8",
   ".json": "application/json",
+  ".mp3": "audio/mpeg",
+  ".txt": "text/plain; charset=utf-8",
 };
 
 /** Serves job outputs (video, screenshots, summary) with HTTP Range support for video seeking. */

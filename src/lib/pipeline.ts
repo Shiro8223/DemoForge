@@ -10,7 +10,8 @@ import { templateStoryboard, templateSummary, writeStory } from "@/lib/storyboar
 import { assertPublicLiveUrl, parseLiveUrl } from "@/lib/validation/live-url";
 import * as higgsfield from "@/lib/higgsfield";
 import * as higgsfieldApi from "@/lib/higgsfield/api";
-import { assembleVideo, probeHasVideo } from "@/lib/video";
+import { assembleVideo, probeDuration, probeHasVideo } from "@/lib/video";
+import { elevenlabsAvailable, synthesize, templateScript, writeScript } from "@/lib/voiceover";
 import { jobDir, JobTracker } from "@/lib/storage/jobs";
 import type { GeneratedScene, Job } from "@/types";
 
@@ -92,6 +93,9 @@ async function fullPipeline(t: JobTracker, opts: RunOptions) {
 
     // 7-8. Summary + storyboard ------------------------------------------------
     await writeStoryStages(t, shots, meta);
+
+    // 8b. ElevenLabs voiceover (never fatal: the video is still made without it) --
+    await voiceoverStage(t);
 
     // 9. Higgsfield ----------------------------------------------------------
     await generateScenes(t);
@@ -231,6 +235,33 @@ async function writeStoryStages(t: JobTracker, shots: NonNullable<Job["outputs"]
   await t.stage("storyboard", "completed", `${story.storyboard.scenes.length} scenes · ${story.storyboard.duration}s · validated`);
 }
 
+async function voiceoverStage(t: JobTracker) {
+  const job = t.job;
+  if (!elevenlabsAvailable()) {
+    await t.stage("voiceover", "skipped", "ELEVENLABS_API_KEY is not set");
+    return;
+  }
+  await t.stage("voiceover", "running", "Writing the script");
+  try {
+    const script = await writeScript(job.outputs.storyboard!, job.outputs.analysis!).catch(async (e) => {
+      await t.notice(`Gemini voiceover script failed, used the on-screen text instead: ${errMsg(e)}`);
+      return { text: templateScript(job.outputs.storyboard!, job.outputs.analysis!), authoredBy: "template" as const };
+    });
+    await t.stage("voiceover", "running", "ElevenLabs is reading the script");
+    const rel = "voiceover.mp3";
+    const r = await synthesize(script.text, path.join(jobDir(job.id), rel));
+    const secs = await probeDuration(path.join(jobDir(job.id), rel)).catch(() => 0);
+    job.outputs.voiceover = rel;
+    job.outputs.narration = { text: script.text, authoredBy: script.authoredBy, voiceId: r.voiceId, model: r.model };
+    await fs.writeFile(path.join(jobDir(job.id), "voiceover.txt"), script.text);
+    await t.save();
+    await t.stage("voiceover", "completed", `${script.text.split(" ").length} words · ${secs.toFixed(1)}s · ${script.authoredBy === "gemini" ? "script by Gemini" : "script from on-screen text"}`);
+  } catch (e) {
+    await t.stage("voiceover", "failed", errMsg(e));
+    await t.notice(`No voiceover: ${errMsg(e)} The video is made with music only.`);
+  }
+}
+
 async function generateScenes(t: JobTracker, onlySceneId?: string) {
   const job = t.job;
   const sb = job.outputs.storyboard!;
@@ -333,6 +364,7 @@ async function assembleStage(t: JobTracker) {
     output: path.join(out, "final-demo.mp4"),
     poster: path.join(out, "poster.jpg"),
     repoLabel: `github.com/${job.owner}/${job.repo}`,
+    voiceover: job.outputs.voiceover ? path.join(out, job.outputs.voiceover) : null,
     onProgress: (m) => t.stage("assemble", "running", m),
   });
   await fs.rm(path.join(out, "render"), { recursive: true, force: true });

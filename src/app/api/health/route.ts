@@ -4,6 +4,7 @@ import { config } from "@/lib/config";
 import { getCredentials } from "@/lib/higgsfield";
 import { apiConfigured } from "@/lib/higgsfield/api";
 import { workerAlive } from "@/lib/storage/jobs";
+import { elevenlabsAvailable } from "@/lib/voiceover";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export async function GET() {
     worker: await workerAlive(),
     gemini: !!config.gemini.apiKey,
     higgsfield: apiConfigured() || !!(await getCredentials()),
+    elevenlabs: elevenlabsAvailable(),
     ffmpeg,
     sandbox: config.sandbox,
   });
