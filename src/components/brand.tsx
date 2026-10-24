@@ -3,13 +3,13 @@ import { cn } from "@/lib/utils";
 
 export const REPO_URL = "https://github.com/Shiro8223/DemoForge";
 
-/** Gradient logo tile with the clapperboard mark. */
+/** Chunky logo tile with the clapperboard mark. */
 export function LogoMark({ size = "md" }: { size?: "sm" | "md" }) {
   return (
     <span
       className={cn(
-        "grid shrink-0 place-items-center bg-gradient-to-br from-violet-500 to-cyan-400 text-white",
-        size === "md" ? "logo-glow size-8 rounded-lg [&_svg]:size-[18px]" : "size-6 rounded-md [&_svg]:size-3",
+        "grid shrink-0 place-items-center border-black bg-pop-pink text-black",
+        size === "md" ? "size-9 -rotate-6 rounded-lg border-3 shadow-brutal-sm [&_svg]:size-[18px]" : "size-6 rounded-md border-2 [&_svg]:size-3",
       )}
     >
       <Clapperboard />
