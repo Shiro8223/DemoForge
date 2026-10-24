@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Dashboard", match: (p: string) => p === "/" },
-  { href: "/#recent", label: "Jobs", match: (p: string) => p.startsWith("/jobs") },
+  { href: "/jobs", label: "Jobs", match: (p: string) => p.startsWith("/jobs") },
   { href: `${REPO_URL}#readme`, label: "Docs", external: true },
   { href: "/settings", label: "Settings", match: (p: string) => p.startsWith("/settings") },
 ];
