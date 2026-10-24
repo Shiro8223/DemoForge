@@ -2,22 +2,26 @@
  * Runs a single generation synchronously (no web server/worker needed).
  *   npm run once -- https://github.com/owner/repo
  *   npm run once -- --local tests/fixtures/launchpad     (pipeline test without cloning)
+ *   npm run once -- <github-url> --live https://team-app.vercel.app   (screenshot the running site)
  */
 import path from "node:path";
 import { parseGitHubUrl } from "../src/lib/github";
 import { createJob, getJob } from "../src/lib/storage/jobs";
 import { runJob } from "../src/lib/pipeline";
+import { parseLiveUrl } from "../src/lib/validation/live-url";
 
 const args = process.argv.slice(2);
 const localIdx = args.indexOf("--local");
 const localRepoDir = localIdx >= 0 ? path.resolve(args[localIdx + 1]) : undefined;
-const url = localRepoDir ? `https://github.com/local/${path.basename(localRepoDir)}` : args[0];
+const liveIdx = args.indexOf("--live");
+const liveUrl = liveIdx >= 0 ? parseLiveUrl(args[liveIdx + 1] ?? "").url : undefined;
+const url = localRepoDir ? `https://github.com/local/${path.basename(localRepoDir)}` : args.find((a, i) => !a.startsWith("--") && (liveIdx < 0 || i !== liveIdx + 1));
 if (!url) {
-  console.error("Usage: npm run once -- <github-url> | --local <dir>");
+  console.error("Usage: npm run once -- <github-url> [--live <site-url>] | --local <dir>");
   process.exit(1);
 }
 const parsed = parseGitHubUrl(url);
-const job = await createJob({ repoUrl: parsed.webUrl, owner: parsed.owner, repo: parsed.repo });
+const job = await createJob({ repoUrl: parsed.webUrl, owner: parsed.owner, repo: parsed.repo, liveUrl });
 console.log(`job ${job.id}`);
 const timer = setInterval(async () => {
   const j = await getJob(job.id);
