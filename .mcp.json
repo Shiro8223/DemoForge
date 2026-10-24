@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "demoforge": {
+      "command": "node",
+      "args": ["node_modules/tsx/dist/cli.mjs", "mcp/demoforge-server.ts"],
+      "env": { "DEMOFORGE_URL": "http://localhost:3000" }
+    }
+  }
+}

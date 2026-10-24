@@ -54,6 +54,27 @@ npm run once -- --local tests/fixtures/launchpad   # bundled fixture app, no clo
 
 Secrets are only read server-side. They are never sent to the browser, never placed in Gemini prompts, and never passed to repository processes.
 
+## Use it from an agent (MCP)
+
+DemoForge ships an MCP server, so Claude Code, Claude Desktop or any MCP client can make videos for you:
+"make a 16:9 demo of github.com/owner/repo with a hype narrator".
+
+It talks to the running app (`DEMOFORGE_URL`, default `http://localhost:3000`), so keep the service or `npm run dev:all` running.
+Claude Code picks it up from `.mcp.json` when you open this project. For other clients, run it over stdio:
+
+```json
+{ "mcpServers": { "demoforge": { "command": "node", "args": ["<repo>/node_modules/tsx/dist/cli.mjs", "<repo>/mcp/demoforge-server.ts"] } } }
+```
+
+| Tool | What it does |
+| --- | --- |
+| `generate_demo` | Queue a video: repo URL plus the same options as the home page (aspect, length, scenes, camera, filter, blend, instructions, voice, tone). |
+| `wait_for_job` | Wait (up to 10 min per call) and return stages, notices, scenes and the video URL + local path. |
+| `get_job` / `list_jobs` | Inspect jobs. |
+| `edit_scene` | Change a scene's caption, length, transition, motion prompt or narration (optionally re-animate it), then re-render. |
+| `regenerate_job` / `delete_job` | Start over with the same settings / remove a job and its files. |
+| `demoforge_status` | Worker and integration health. |
+
 ## Architecture
 
 ```

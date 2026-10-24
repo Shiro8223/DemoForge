@@ -10,6 +10,7 @@
     "start": "next start",
     "worker": "tsx workers/generation-worker.ts",
     "once": "tsx scripts/run-once.ts",
+    "mcp": "tsx mcp/demoforge-server.ts",
     "dev:all": "concurrently -k -n web,worker -c cyan,magenta \"npm:dev\" \"npm:worker\"",
     "start:all": "concurrently -k -n web,worker -c cyan,magenta \"npm:start\" \"npm:worker\"",
     "service:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service.ps1 install",
