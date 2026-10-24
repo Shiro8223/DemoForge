@@ -11,7 +11,7 @@ type Status = { available: boolean; account: { login: string; avatarUrl: string 
 
 export const SIGN_IN_URL = "/api/auth/github/login";
 
-function useGitHubStatus() {
+export function useGitHubStatus() {
   const [status, setStatus] = useState<Status | null>(null);
   const load = () =>
     fetch("/api/auth/github", { cache: "no-store" })
@@ -56,7 +56,7 @@ export function HeaderGitHub() {
   }
 
   if (!status) return <span className="h-8 w-8 sm:w-24" aria-hidden />;
-  const base = "flex h-8 items-center gap-2 rounded-lg border border-line px-2 text-[13px] transition-colors duration-150 hover:border-line-strong sm:px-2.5";
+  const base = "brutal-press flex h-9 items-center gap-2 rounded-lg border-2 border-black bg-white px-2 text-[13px] font-bold shadow-brutal-sm sm:px-2.5";
 
   if (!status.account)
     return (
@@ -82,18 +82,18 @@ export function HeaderGitHub() {
         <ChevronDown className={`hidden size-3.5 text-muted transition-transform sm:block ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-line bg-panel shadow-2xl shadow-black/50">
+        <div role="menu" className="absolute right-0 z-50 mt-3 w-56 overflow-hidden rounded-xl border-3 border-black bg-white shadow-brutal">
           <div className="border-b border-line px-3.5 py-3">
             <p className="text-xs text-muted">Signed in to GitHub as</p>
             <p className="mt-0.5 truncate text-sm font-medium text-fg">@{login}</p>
           </div>
-          <a role="menuitem" href={`https://github.com/${login}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3.5 py-2.5 text-[13px] text-muted hover:bg-panel-2 hover:text-fg">
+          <a role="menuitem" href={`https://github.com/${login}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-bold text-black hover:bg-pop-yellow">
             <GithubIcon /> View profile
           </a>
-          <a role="menuitem" href="/settings#github" className="flex items-center gap-2 px-3.5 py-2.5 text-[13px] text-muted hover:bg-panel-2 hover:text-fg">
+          <a role="menuitem" href="/settings#github" className="flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-bold text-black hover:bg-pop-yellow">
             <Settings className="size-4" /> GitHub settings
           </a>
-          <button role="menuitem" type="button" onClick={signOut} className="flex w-full items-center gap-2 border-t border-line px-3.5 py-2.5 text-left text-[13px] text-red-300 hover:bg-panel-2">
+          <button role="menuitem" type="button" onClick={signOut} className="flex w-full items-center gap-2 border-t-2 border-black px-3.5 py-2.5 text-left text-[13px] font-bold text-black hover:bg-pop-red">
             <LogOut className="size-4" /> Sign out
           </button>
         </div>
@@ -124,10 +124,10 @@ export function GitHubSettings() {
   }
 
   return (
-    <section id="github" className="card-inset scroll-mt-20 rounded-2xl border border-line bg-panel/80 p-5">
+    <section id="github" className="scroll-mt-20 rounded-2xl border-3 border-black bg-white shadow-brutal p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl border border-line bg-panel-2 text-fg">
+          <span className="grid size-11 rotate-6 place-items-center rounded-xl border-3 border-black bg-pop-cyan text-black">
             <GithubIcon className="size-[18px]" />
           </span>
           <div>
@@ -137,7 +137,7 @@ export function GitHubSettings() {
         </div>
         {status?.account ? (
           <Badge variant="success">
-            <span className="size-1.5 rounded-full bg-emerald-400" /> Signed in as @{status.account.login}
+            <span className="size-1.5 rounded-full bg-black" /> Signed in as @{status.account.login}
           </Badge>
         ) : (
           <Badge>{status?.available ? "Public repos only" : "Not configured"}</Badge>
@@ -145,7 +145,7 @@ export function GitHubSettings() {
       </div>
 
       {result && (
-        <p className={`mt-4 flex items-center gap-2 text-[13px] ${result.ok ? "text-emerald-300" : "text-amber-300"}`}>
+        <p className={`mt-4 flex items-center gap-2 text-[13px] ${result.ok ? "bg-pop-green" : "bg-pop-yellow"} w-fit rounded-lg border-2 border-black px-3 py-1.5 font-bold text-black`}>
           {result.ok ? <CircleCheck className="size-4 shrink-0" /> : <TriangleAlert className="size-4 shrink-0" />} {result.text}
         </p>
       )}

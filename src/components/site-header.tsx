@@ -17,9 +17,9 @@ const NAV = [
 export function SiteHeader() {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-bg/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight">
+    <header className="sticky top-0 z-40 border-b-3 border-black bg-white">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Link href="/" className="flex items-center gap-2.5 text-lg font-extrabold tracking-tight">
           <LogoMark />
           DemoForge
         </Link>
@@ -27,8 +27,8 @@ export function SiteHeader() {
           {NAV.map((n) => {
             const active = !n.external && n.match?.(pathname);
             const cls = cn(
-              "rounded-lg px-3 py-1.5 transition-colors duration-150",
-              active ? "bg-panel-2 text-fg" : "text-muted hover:bg-panel-2 hover:text-fg",
+              "rounded-lg border-2 px-3 py-1 font-bold transition-colors duration-150",
+              active ? "border-black bg-pop-cyan text-black shadow-brutal-sm" : "border-transparent text-black hover:border-black hover:bg-pop-yellow",
             );
             return n.external ? (
               <a key={n.label} href={n.href} target="_blank" rel="noreferrer" className={cls}>
@@ -45,7 +45,7 @@ export function SiteHeader() {
           <HeaderGitHub />
           <Link
             href="/#import"
-            className="flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 text-[13px] font-medium text-white shadow-[0_0_0_1px_rgb(255_255_255/0.08)_inset,0_8px_24px_-8px_rgb(139_92_246/0.6)] hover:brightness-110"
+            className="brutal-press flex h-9 items-center gap-1.5 rounded-lg border-2 border-black bg-pop-pink px-3.5 text-[13px] font-bold text-black shadow-brutal-sm"
           >
             <Plus className="size-3.5" /> New demo
           </Link>

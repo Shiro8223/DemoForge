@@ -2,6 +2,8 @@ import { Fragment } from "react";
 import { ArrowRight, Brain, Camera, Film, GitBranch, LayoutTemplate, Rocket, Sparkles, Star } from "lucide-react";
 import { ImportForm } from "@/components/landing/import-form";
 import { RecentJobs } from "@/components/landing/recent-jobs";
+import { pop } from "@/lib/pop";
+import { cn } from "@/lib/utils";
 
 const STEPS = [
   { icon: GitBranch, title: "Clone", body: "Your public repo lands in an isolated, throwaway workspace." },
@@ -16,25 +18,32 @@ const STEPS = [
 export default function Home() {
   return (
     <main>
-      <section className="hero-glow">
-        <div className="mx-auto max-w-6xl px-4 pt-20 pb-16 text-center sm:px-6">
-          <p className="mb-8 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[13px] text-muted">
+      <section className="relative border-b-3 border-black">
+        <div className="bg-grid pointer-events-none absolute inset-0 -z-10" />
+        <div className="mx-auto max-w-6xl px-4 pt-20 pb-20 text-center sm:px-6">
+          <p className="mb-8 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[13px] font-bold text-black">
             {["Real screenshots", "AI cinematics", "zero editing"].map((t, i) => (
               <Fragment key={t}>
-                {i > 0 && <Star aria-hidden className="size-3 fill-amber-400 text-amber-400" />}
+                {i > 0 && <Star aria-hidden className="size-4 fill-pop-yellow text-black" />}
                 {t}
               </Fragment>
             ))}
           </p>
           <h1 className="mx-auto max-w-4xl font-display text-5xl leading-[0.95] sm:text-[88px]">
             Turn any GitHub repo into a
-            <br className="hidden sm:block" /> <span className="text-gradient">cinematic product demo</span>
+            <span className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-3 sm:mt-5">
+              {["cinematic", "product", "demo"].map((w, i) => (
+                <span key={w} className={cn("marker", pop(i * 2 + 1), i % 2 ? "rotate-1" : "-rotate-1")}>
+                  {w}
+                </span>
+              ))}
+            </span>
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted">
+          <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed font-medium text-fg">
             Paste a public repository and get a 20–30s vertical promo video. We clone, understand, launch, capture real screens and assemble it —
             automatically.
           </p>
-          <div id="import" className="mx-auto mt-10 max-w-xl scroll-mt-24">
+          <div id="import" className="mx-auto mt-10 max-w-[632px] scroll-mt-24">
             <ImportForm />
           </div>
         </div>
@@ -50,24 +59,24 @@ export default function Home() {
           {STEPS.map((s, i) => (
             <li
               key={s.title}
-              className="group card-inset rounded-2xl border border-line bg-panel/80 p-5 transition-colors duration-150 hover:border-line-strong"
+              className="group brutal-press rounded-2xl border-3 border-black bg-white p-5 shadow-brutal-sm"
             >
               <div className="mb-4 flex items-center justify-between">
-                <span className="grid size-10 place-items-center rounded-xl border border-line bg-panel-2 text-accent transition-transform duration-150 group-hover:scale-105">
-                  <s.icon className="size-[18px]" />
+                <span className={cn("grid size-11 place-items-center rounded-xl border-3 border-black text-black transition-transform duration-150 group-hover:-rotate-6", pop(i))}>
+                  <s.icon className="size-5" />
                 </span>
-                <span className="font-mono text-xs text-muted">0{i + 1}</span>
+                <span className="font-display text-2xl text-black/25">0{i + 1}</span>
               </div>
               <h3 className="mb-1.5 text-lg">{s.title}</h3>
               <p className="text-[13px] leading-relaxed text-muted">{s.body}</p>
             </li>
           ))}
-          <li className="flex flex-col justify-center rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-600/15 to-indigo-600/5 p-5">
+          <li className="flex flex-col justify-center rounded-2xl border-3 border-black bg-pop-yellow p-5 shadow-brutal-sm">
             <h3 className="mb-1.5 text-lg">Ready to forge?</h3>
-            <p className="mb-4 text-[13px] leading-relaxed text-muted">
+            <p className="mb-4 text-[13px] leading-relaxed text-black">
               Real screenshots for real features. AI footage only where it can&apos;t misrepresent your product.
             </p>
-            <a href="#import" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-violet-300 transition-colors hover:text-violet-200">
+            <a href="#import" className="brutal-press inline-flex w-fit items-center gap-1.5 rounded-lg border-2 border-black bg-white px-3 py-1.5 text-[13px] font-bold text-black">
               Start a demo <ArrowRight className="size-3.5" />
             </a>
           </li>

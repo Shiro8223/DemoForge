@@ -64,11 +64,11 @@ export function HiggsfieldSettings({ maxScenes, children }: { maxScenes: number;
 
   return (
     <>
-      <section id="integrations" className="card-inset scroll-mt-20 overflow-hidden rounded-2xl border border-line bg-panel/80">
+      <section id="integrations" className="scroll-mt-20 overflow-hidden rounded-2xl border-3 border-black bg-white shadow-brutal">
         <div className="p-5 pb-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="logo-glow grid size-10 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white">
+              <span className="grid size-11 -rotate-6 place-items-center rounded-xl border-3 border-black bg-pop-purple text-black">
                 <Sparkles className="size-[18px]" />
               </span>
               <div>
@@ -78,10 +78,10 @@ export function HiggsfieldSettings({ maxScenes, children }: { maxScenes: number;
             </div>
             {status?.configured ? (
               <Badge variant="success">
-                <span className="size-1.5 rounded-full bg-emerald-400" /> Connected · {status.source === "env" ? "from .env" : "saved"} · {status.hint}
+                <span className="size-1.5 rounded-full bg-black" /> Connected · {status.source === "env" ? "from .env" : "saved"} · {status.hint}
               </Badge>
             ) : (
-              <Badge variant="warning"><span className="size-1.5 rounded-full bg-amber-400" /> Not configured</Badge>
+              <Badge variant="warning"><span className="size-1.5 rounded-full bg-black" /> Not configured</Badge>
             )}
           </div>
           <p className="mt-4 text-sm leading-relaxed text-muted">
@@ -135,8 +135,8 @@ export function HiggsfieldSettings({ maxScenes, children }: { maxScenes: number;
 
           {test &&
             (test.ok ? (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-[13px]">
-                <p className="flex items-center gap-2 text-emerald-300">
+              <div className="rounded-xl border-3 border-black bg-pop-green/30 px-4 py-3 text-[13px]">
+                <p className="flex items-center gap-2 font-bold text-black">
                   <CircleCheck className="size-4 shrink-0" /> Connection OK · <span className="font-mono">{test.tools?.length} tools discovered</span> ·{" "}
                   <span className="font-mono">{test.ms}ms</span>
                 </p>
@@ -147,8 +147,8 @@ export function HiggsfieldSettings({ maxScenes, children }: { maxScenes: number;
                 <p className="mt-2 font-mono text-xs break-words text-muted">{test.tools?.join(", ")}</p>
               </div>
             ) : (
-              <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-200">
-                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-red-300" /> {test.error}
+              <div className="flex items-start gap-2 rounded-xl border-3 border-black bg-pop-red/25 px-4 py-3 text-[13px] text-black">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-black" /> {test.error}
               </div>
             ))}
           <p className="text-xs text-muted">
@@ -170,10 +170,10 @@ export function HiggsfieldSettings({ maxScenes, children }: { maxScenes: number;
 
       {children}
 
-      <section id="danger" className="card-inset scroll-mt-20 rounded-2xl border border-red-500/20 bg-panel/80 p-5">
+      <section id="danger" className="scroll-mt-20 rounded-2xl border-3 border-black bg-pop-red/15 p-5 shadow-brutal">
         <div className="flex items-center gap-2">
-          <TriangleAlert className="size-4 text-red-300" />
-          <h2 className="text-xl text-red-200">Danger zone</h2>
+          <TriangleAlert className="size-5 text-black" />
+          <h2 className="text-xl text-black">Danger zone</h2>
         </div>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           Removing the Higgsfield key falls back to local motion-graphics title cards for cinematic scenes.

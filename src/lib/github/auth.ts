@@ -84,3 +84,28 @@ export async function completeSignIn(code: string, redirectUri: string): Promise
   const u = (await user.json()) as { login: string; avatar_url?: string };
   return { token: j.access_token, login: u.login, avatarUrl: u.avatar_url ?? null };
 }
+
+export interface UserRepo {
+  fullName: string;
+  private: boolean;
+  description: string | null;
+  pushedAt: string | null;
+}
+
+/** Repos the signed-in user can read (own, collaborator, org), most recently pushed first. */
+export async function listUserRepos(token: string, maxPages = 3): Promise<UserRepo[]> {
+  const repos: UserRepo[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const u = new URL("https://api.github.com/user/repos");
+    u.search = new URLSearchParams({ per_page: "100", page: String(page), sort: "pushed", affiliation: "owner,collaborator,organization_member" }).toString();
+    const res = await fetch(u, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "DemoForge" },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(res.status === 401 ? "GitHub sign-in expired. Sign in again." : `GitHub returned ${res.status}.`);
+    const batch = (await res.json()) as { full_name: string; private: boolean; description: string | null; pushed_at: string | null }[];
+    repos.push(...batch.map((r) => ({ fullName: r.full_name, private: r.private, description: r.description, pushedAt: r.pushed_at })));
+    if (batch.length < 100) break;
+  }
+  return repos;
+}

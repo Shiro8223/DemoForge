@@ -128,7 +128,7 @@ export function JobView({ jobId }: { jobId: string }) {
             ) : (
               <Badge variant="accent"><Loader2 className="animate-spin" /> {job.status === "pending" ? "Queued" : "Running"}</Badge>
             )}
-            <span className="rounded-md border border-line bg-panel-2 px-2 py-0.5 font-mono text-[11px] text-muted">{job.id}</span>
+            <span className="rounded-md border-2 border-black bg-panel-2 px-2 py-0.5 font-mono text-[11px] text-muted">{job.id}</span>
             {job.outputs.authoredBy && (
               <Badge>{job.outputs.authoredBy === "gemini" ? "Storyboard by Gemini" : job.outputs.authoredBy === "claude" ? "Storyboard by Claude" : "Template storyboard"}</Badge>
             )}
@@ -163,18 +163,18 @@ export function JobView({ jobId }: { jobId: string }) {
       </div>
 
       {active && !workerUp && (
-        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border-3 border-black bg-pop-yellow p-4 text-sm text-black shadow-brutal-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-black" />
           <p>No generation worker is running, so this job is waiting in the queue. Start one with <code className="font-mono">npm run worker</code>.</p>
         </div>
       )}
 
       {job.status === "failed" && job.error && (
-        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-300" />
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border-3 border-black bg-pop-red/30 p-4 text-sm text-black shadow-brutal-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-black" />
           <div className="min-w-0">
             <p className="font-medium">Generation failed</p>
-            <p className="mt-1 font-mono text-xs whitespace-pre-wrap text-red-200/80">{job.error}</p>
+            <p className="mt-1 font-mono text-xs whitespace-pre-wrap text-black/80">{job.error}</p>
           </div>
         </div>
       )}
@@ -196,9 +196,9 @@ export function JobView({ jobId }: { jobId: string }) {
           </Card>
 
           {job.notices.length > 0 && (
-            <Card className="border-amber-500/20">
+            <Card className="bg-pop-yellow/40">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-amber-200"><Info className="size-4" /> Heads up</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-black"><Info className="size-4" /> Heads up</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-1.5 text-sm text-fg/80">
@@ -246,7 +246,7 @@ export function JobView({ jobId }: { jobId: string }) {
                     href={file(s.desktop)}
                     target="_blank"
                     rel="noreferrer"
-                    className="group overflow-hidden rounded-xl border border-line bg-panel-2 transition-colors hover:border-line-strong"
+                    className="group brutal-press overflow-hidden rounded-xl border-3 border-black bg-white shadow-brutal-sm"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={file(s.desktop)} alt={s.title} className="aspect-[16/10] w-full object-cover object-top transition group-hover:opacity-90" />
@@ -274,7 +274,7 @@ export function JobView({ jobId }: { jobId: string }) {
                     ["Start", a.startScript ? `${a.packageManager} run ${a.startScript}` : a.runKind],
                     ["Analysed by", a.analysedBy === "gemini" ? "Gemini" : a.analysedBy === "claude" ? "Claude" : "Static analysis"],
                   ].map(([k, val]) => (
-                    <div key={k} className="rounded-xl border border-line bg-panel-2 p-3">
+                    <div key={k} className="rounded-xl border-2 border-black bg-panel-2 p-3">
                       <dt className="text-[11px] tracking-wide text-muted uppercase">{k}</dt>
                       <dd className="mt-1 truncate font-mono text-xs">{val}</dd>
                     </div>
@@ -287,7 +287,7 @@ export function JobView({ jobId }: { jobId: string }) {
                   </div>
                 )}
                 <div className="flex flex-wrap gap-1.5">
-                  {a.routes.map((r) => <code key={r} className="rounded-md border border-line bg-panel-2 px-2 py-0.5 font-mono text-xs">{r}</code>)}
+                  {a.routes.map((r) => <code key={r} className="rounded-md border-2 border-black bg-panel-2 px-2 py-0.5 font-mono text-xs">{r}</code>)}
                 </div>
               </CardContent>
             </Card>
@@ -328,7 +328,7 @@ export function JobView({ jobId }: { jobId: string }) {
         {/* Right: player and output, sticky on desktop */}
         <div className="space-y-6 self-start lg:sticky lg:top-20">
           {hasVideo ? (
-            <div className="overflow-hidden rounded-3xl border border-line bg-black shadow-[0_30px_80px_-30px_rgb(139_92_246/0.6)]">
+            <div className="overflow-hidden rounded-3xl border-3 border-black bg-black shadow-brutal-lg">
               <video
                 key={v}
                 src={`${file(job.outputs.video!)}?v=${v}`}
@@ -339,13 +339,13 @@ export function JobView({ jobId }: { jobId: string }) {
               />
             </div>
           ) : (
-            <div className="relative grid aspect-[9/16] place-items-center overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-violet-900/40 via-black to-cyan-900/30">
+            <div className="relative grid aspect-[9/16] place-items-center overflow-hidden rounded-3xl border-3 border-black bg-pop-purple shadow-brutal-lg">
               {shots[0] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={file(shots[0].mobile)} alt="" className="absolute inset-0 size-full object-cover object-top opacity-25 blur-sm" />
               ) : null}
               <div className="relative text-center">
-                {active ? <Loader2 className="mx-auto size-8 animate-spin text-violet-300" /> : <AlertTriangle className="mx-auto size-8 text-muted" />}
+                {active ? <Loader2 className="mx-auto size-9 animate-spin text-black" /> : <AlertTriangle className="mx-auto size-9 text-black" />}
                 <p className="mt-3 text-sm text-muted">{active ? "Your demo is being forged…" : "No video produced"}</p>
               </div>
             </div>

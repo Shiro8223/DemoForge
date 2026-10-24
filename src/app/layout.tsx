@@ -19,7 +19,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${inter.variable} ${interDisplay.variable} ${anton.variable} ${jetbrains.variable}`}>
       <body className="flex min-h-dvh flex-col">
-        <div className="bg-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[900px]" />
         <SiteHeader />
         <div className="flex-1">{children}</div>
         <SiteFooter />
