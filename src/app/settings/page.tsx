@@ -19,7 +19,7 @@ const SECTIONS = [
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-line bg-panel-2 px-3.5 py-2.5">
+    <div className="rounded-xl border-2 border-black bg-panel-2 px-3.5 py-2.5">
       <p className="text-[11px] tracking-wide text-muted uppercase">{label}</p>
       <p className="mt-1 font-mono text-[13px] text-fg">{value}</p>
     </div>
@@ -42,10 +42,10 @@ export default function SettingsPage() {
               href={`#${s.id}`}
               className={cn(
                 "flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-colors duration-150",
-                i === 0 ? "border-line bg-panel-2 text-fg" : "border-transparent text-muted hover:bg-panel-2 hover:text-fg",
+                i === 0 ? "border-black bg-pop-cyan font-bold text-black shadow-brutal-sm" : "border-transparent font-bold text-black hover:border-black hover:bg-pop-yellow",
               )}
             >
-              <s.icon className={cn("size-4", i === 0 && "text-accent")} /> {s.label}
+              <s.icon className="size-4" /> {s.label}
             </a>
           ))}
         </nav>
@@ -56,11 +56,11 @@ export default function SettingsPage() {
               <GitHubSettings />
             </Suspense>
 
-            <section id="generation" className="card-inset scroll-mt-20 rounded-2xl border border-line bg-panel/80 p-5">
+            <section id="generation" className="scroll-mt-20 rounded-2xl border-3 border-black bg-white shadow-brutal p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl">Gemini</h2>
                 <Badge variant={gemini ? "success" : "warning"}>
-                  <span className={cn("size-1.5 rounded-full", gemini ? "bg-emerald-400" : "bg-amber-400")} />
+                  <span className={cn("size-1.5 rounded-full", "bg-black")} />
                   {gemini ? "Configured via GEMINI_API_KEY" : "Not configured"}
                 </Badge>
               </div>
@@ -75,10 +75,10 @@ export default function SettingsPage() {
               </p>
             </section>
 
-            <section id="sandbox" className="card-inset scroll-mt-20 rounded-2xl border border-line bg-panel/80 p-5">
+            <section id="sandbox" className="scroll-mt-20 rounded-2xl border-3 border-black bg-white shadow-brutal p-5">
               <h2 className="text-xl">Sandbox mode</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">Repositories are untrusted code. This controls how installs and launches are isolated.</p>
-              <div className="mt-4 inline-flex rounded-xl border border-line bg-panel p-1" role="radiogroup" aria-label="Sandbox mode (read-only)">
+              <div className="mt-4 inline-flex rounded-xl border-2 border-black bg-panel p-1" role="radiogroup" aria-label="Sandbox mode (read-only)">
                 {(["local", "docker"] as const).map((m) => (
                   <span
                     key={m}
@@ -86,7 +86,7 @@ export default function SettingsPage() {
                     aria-checked={config.sandbox === m}
                     className={cn(
                       "flex h-9 items-center rounded-lg border px-4 text-[13px] font-medium capitalize",
-                      config.sandbox === m ? "border-line-strong bg-panel-2 text-fg" : "border-transparent text-muted",
+                      config.sandbox === m ? "border-black bg-pop-green font-bold text-black" : "border-transparent text-muted",
                     )}
                   >
                     {m}
@@ -102,8 +102,8 @@ export default function SettingsPage() {
                 </div>
               )}
               {config.sandbox === "local" && (
-                <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-[13px] text-amber-100">
-                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-300" />
+                <div className="mt-4 flex items-start gap-3 rounded-xl border-3 border-black bg-pop-yellow p-3.5 text-[13px] text-black">
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-black" />
                   <p>
                     Local mode runs repository code directly on this machine with a scrubbed environment, a throwaway HOME and timeouts. It is fine for
                     your own repos but is <span className="font-medium">not a security boundary</span>.

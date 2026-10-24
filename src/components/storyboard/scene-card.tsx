@@ -1,5 +1,8 @@
 "use client";
 
+import { pop } from "@/lib/pop";
+import { cn } from "@/lib/utils";
+
 import { useState } from "react";
 import { Image as ImageIcon, Loader2, Pencil, Sparkles, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -50,23 +53,23 @@ export function SceneCard(props: {
     </Badge>
   );
   const media = (
-    <div className="relative aspect-[9/16] overflow-hidden bg-gradient-to-br from-violet-900/60 via-panel-2 to-cyan-900/40">
+    <div className={cn("relative aspect-[9/16] overflow-hidden", pop(index))}>
       {thumb ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={thumb} alt="" className="size-full object-cover object-top" />
       ) : (
-        <div className="grid size-full place-items-center px-2 text-center font-display text-[11px] leading-tight font-bold text-white/90">
+        <div className="grid size-full place-items-center px-2 text-center font-display text-[11px] leading-tight text-black">
           {scene.textOverlay}
         </div>
       )}
-      <span className="absolute top-1.5 left-1.5 rounded-md bg-black/60 px-1.5 font-mono text-[10px] text-white">{String(index + 1).padStart(2, "0")}</span>
-      <span className="absolute top-1.5 right-1.5 rounded-md bg-black/60 px-1.5 font-mono text-[10px] text-white">{scene.duration}s</span>
+      <span className="absolute top-1.5 left-1.5 rounded-md border-2 border-black bg-white px-1.5 font-mono text-[10px] font-bold text-black">{String(index + 1).padStart(2, "0")}</span>
+      <span className="absolute top-1.5 right-1.5 rounded-md border-2 border-black bg-white px-1.5 font-mono text-[10px] font-bold text-black">{scene.duration}s</span>
     </div>
   );
 
   if (!editing)
     return (
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-panel-2">
+      <div className="flex flex-col overflow-hidden rounded-2xl border-3 border-black bg-white shadow-brutal-sm">
         {media}
         <div className="flex flex-1 flex-col gap-2 p-2.5">
           <p className="truncate text-xs font-semibold" title={scene.title}>{scene.title}</p>
@@ -87,8 +90,8 @@ export function SceneCard(props: {
     );
 
   return (
-    <div className="col-span-full flex gap-4 rounded-2xl border border-violet-500/30 bg-panel-2 p-3">
-      <div className="w-24 shrink-0 overflow-hidden rounded-xl border border-line">{media}</div>
+    <div className="col-span-full flex gap-4 rounded-2xl border-3 border-black bg-pop-yellow/30 p-3 shadow-brutal">
+      <div className="w-24 shrink-0 overflow-hidden rounded-xl border-2 border-black">{media}</div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold">{scene.title}</p>
@@ -110,7 +113,7 @@ export function SceneCard(props: {
               <select
                 value={transition}
                 onChange={(e) => setTransition(e.target.value as Scene["transition"])}
-                className="h-10 rounded-xl border border-line bg-panel px-3 text-sm text-fg focus-visible:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:outline-none"
+                className="h-10 rounded-xl border-3 border-black bg-white px-3 text-sm text-fg focus-visible:shadow-brutal-sm focus-visible:outline-none"
               >
                 {TRANSITIONS.map((t) => <option key={t}>{t}</option>)}
               </select>

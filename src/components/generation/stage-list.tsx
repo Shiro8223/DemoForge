@@ -28,15 +28,15 @@ export function StageList({ stages }: { stages: StageState[] }) {
           {i < stages.length - 1 && (
             <span
               className={cn(
-                "absolute top-7 left-3 h-[calc(100%-1.5rem)] w-px",
-                s.status === "completed" ? "bg-emerald-500/30" : "bg-line",
+                "absolute top-8 left-[13px] h-[calc(100%-1.75rem)] w-0.5",
+                s.status === "completed" ? "bg-black" : "bg-black/15",
               )}
             />
           )}
           <StatusDot status={s.status} />
           <div className="min-w-0 flex-1 pt-0.5">
             <div className="flex items-baseline justify-between gap-3">
-              <p className={cn("text-sm font-medium", s.status === "pending" && "text-muted")}>{s.label}</p>
+              <p className={cn("text-sm font-bold", s.status === "pending" && "text-muted")}>{s.label}</p>
               <span className="shrink-0 font-mono text-[11px] text-muted">
                 {s.status === "skipped" ? "skipped" : (elapsed(s, now) ?? "—")}
               </span>
@@ -45,7 +45,7 @@ export function StageList({ stages }: { stages: StageState[] }) {
               <p
                 className={cn(
                   "mt-0.5 font-mono text-xs break-words whitespace-pre-wrap",
-                  s.status === "failed" ? "text-red-300/90" : s.status === "skipped" ? "text-amber-200/80" : "text-muted",
+                  s.status === "failed" ? "text-red-700" : s.status === "skipped" ? "text-amber-800" : "text-muted",
                 )}
               >
                 {s.detail}
@@ -54,11 +54,11 @@ export function StageList({ stages }: { stages: StageState[] }) {
             {s.status === "running" && (
               <>
                 {s.detail && (
-                  <div className="mt-3 overflow-hidden rounded-xl border border-line bg-black/40 p-3 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap text-fg/80">
+                  <div className="mt-3 overflow-hidden rounded-xl border-2 border-black bg-panel-2 p-3 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap text-black">
                     › {s.detail}
                   </div>
                 )}
-                <div className="shimmer relative mt-2 h-1 overflow-hidden rounded-full bg-panel-2" />
+                <div className="shimmer relative mt-2 h-3 overflow-hidden rounded-full border-2 border-black bg-pop-blue" />
               </>
             )}
           </div>

@@ -5,7 +5,7 @@ function inline(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|_[^_]+_)/g);
   return parts.map((p, i) => {
     if (p.startsWith("**") && p.endsWith("**")) return <strong key={i} className="text-fg">{p.slice(2, -2)}</strong>;
-    if (p.startsWith("`") && p.endsWith("`")) return <code key={i} className="rounded bg-panel-2 px-1 py-0.5 font-mono text-[0.85em] text-violet-200">{p.slice(1, -1)}</code>;
+    if (p.startsWith("`") && p.endsWith("`")) return <code key={i} className="rounded border border-black bg-pop-yellow/50 px-1 py-0.5 font-mono text-[0.85em] text-black">{p.slice(1, -1)}</code>;
     if (p.startsWith("_") && p.endsWith("_") && p.length > 2) return <em key={i}>{p.slice(1, -1)}</em>;
     return <Fragment key={i}>{p}</Fragment>;
   });
@@ -31,7 +31,7 @@ export function Markdown({ source }: { source: string }) {
     const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
     if (h) {
       flush();
-      const cls = h[1].length === 1 ? "font-display text-xl font-bold mt-2" : "font-display text-sm font-semibold uppercase tracking-wider text-muted mt-5";
+      const cls = h[1].length === 1 ? "font-display text-xl font-bold mt-2" : "font-display text-base uppercase tracking-wider text-black mt-5";
       blocks.push(<p key={blocks.length} className={cls}>{inline(h[2])}</p>);
     } else if (ul || ol) {
       const ordered = !!ol;
@@ -45,5 +45,5 @@ export function Markdown({ source }: { source: string }) {
     }
   }
   flush();
-  return <div className="space-y-2 text-sm leading-relaxed text-fg/85">{blocks}</div>;
+  return <div className="space-y-2 text-sm leading-relaxed text-fg">{blocks}</div>;
 }
