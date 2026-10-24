@@ -55,12 +55,35 @@ export function cleanScript(text: string, wordLimit: number): string {
 
 /** Deterministic script from the storyboard's own on-screen text. */
 export function templateScript(sb: Storyboard, analysis: ProjectAnalysis): string {
-  const lines = sb.scenes
-    .map((s) => s.textOverlay.trim())
-    .filter(Boolean)
+  const name = analysis.name.trim();
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const first = analysis.description.split(/(?<=[.!?])\s/)[0]?.trim() ?? "";
+  // Say the name once: lead with the description if it already names the project.
+  const intro = !first ? `Meet ${name}.` : norm(first).includes(norm(name)) ? first : `${name}. ${first}`;
+  const seen = new Set([norm(name), norm(intro)]);
+  const overlays = sb.scenes.map((s) => s.textOverlay.trim());
+  const lines = overlays
+    .filter((l, i) => {
+      const n = norm(l);
+      // Skip empty lines, repeats, and lines the intro already says.
+      if (!n || seen.has(n) || norm(intro).includes(n)) return false;
+      // The name is spoken in the intro; only the closing line may say it again.
+      if (n.includes(norm(name)) && i !== overlays.length - 1) return false;
+      seen.add(n);
+      return true;
+    })
     .map((l) => (/[.!?]$/.test(l) ? l : `${l}.`));
-  const intro = analysis.description ? `${analysis.name}. ${analysis.description.split(/(?<=[.!?])\s/)[0]}` : `Meet ${analysis.name}.`;
-  return cleanScript([intro, ...lines.slice(1)].join(" "), maxWords(sb.duration));
+  // Thin on-screen text: add up to two verified features (from the code) before the closing line.
+  const extras =
+    lines.length < 3
+      ? analysis.features
+          .map((f) => f.trim())
+          .filter((f) => f && !seen.has(norm(f)) && !norm(intro).includes(norm(f)))
+          .slice(0, 2)
+          .map((f) => (/[.!?]$/.test(f) ? f : `${f}.`))
+      : [];
+  const closing = lines.length && norm(lines[lines.length - 1]).includes(norm(name)) ? lines.splice(-1) : [];
+  return cleanScript([intro, ...lines, ...extras, ...closing].join(" "), maxWords(sb.duration));
 }
 
 const scriptSchema = z.object({
@@ -91,8 +114,9 @@ export async function writeScript(sb: Storyboard, analysis: ProjectAnalysis): Pr
 
 function explain(status: number, body: string) {
   const detail = body.replace(/\s+/g, " ").slice(0, 240);
-  if (status === 401) return `ElevenLabs rejected the API key (check ELEVENLABS_API_KEY). ${detail}`;
+  // ElevenLabs answers 401 {"status":"quota_exceeded"} for a valid key with no characters left, so check quota first.
   if (status === 402 || /quota|credits|insufficient/i.test(body)) return `ElevenLabs account is out of characters/credits. ${detail}`;
+  if (status === 401) return `ElevenLabs rejected the API key (check ELEVENLABS_API_KEY). ${detail}`;
   if (status === 404) return `ElevenLabs voice not found (check ELEVENLABS_VOICE_ID). ${detail}`;
   if (status === 429) return `ElevenLabs rate limit hit, try again in a moment. ${detail}`;
   return `ElevenLabs error ${status}: ${detail}`;

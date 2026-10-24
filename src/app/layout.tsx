@@ -6,6 +6,8 @@ import "./globals.css";
 
 const inter = localFont({ src: "../../assets/fonts/Inter-Medium.otf", variable: "--font-inter", weight: "500" });
 const interDisplay = localFont({ src: "../../assets/fonts/InterDisplay-Bold.otf", variable: "--font-inter-display", weight: "700" });
+// Movie-poster display face for headings: heavy, condensed, set in caps.
+const anton = localFont({ src: "../../assets/fonts/Anton-Regular.ttf", variable: "--font-anton", weight: "400" });
 const jetbrains = localFont({ src: "../../assets/fonts/JetBrainsMono-Regular.ttf", variable: "--font-jetbrains", weight: "400" });
 
 export const metadata: Metadata = {
@@ -15,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${interDisplay.variable} ${jetbrains.variable}`}>
+    <html lang="en" className={`${inter.variable} ${interDisplay.variable} ${anton.variable} ${jetbrains.variable}`}>
       <body className="flex min-h-dvh flex-col">
         <div className="bg-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[900px]" />
         <SiteHeader />

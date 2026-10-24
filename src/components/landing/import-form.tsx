@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Globe, Loader2 } from "lucide-react";
 import { GithubIcon } from "@/components/brand";
+import { SIGN_IN_URL } from "@/components/github-account";
 import { Button } from "@/components/ui/button";
 
 const EXAMPLE = "https://github.com/vercel/nextjs-portfolio-starter";
@@ -13,11 +14,13 @@ export function ImportForm() {
   const [url, setUrl] = useState("");
   const [liveUrl, setLiveUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNeedsSignIn(false);
     setBusy(true);
     try {
       const res = await fetch("/api/generate", {
@@ -26,7 +29,10 @@ export function ImportForm() {
         body: JSON.stringify({ repoUrl: url, ...(liveUrl.trim() ? { liveUrl } : {}) }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
+      if (!res.ok) {
+        setNeedsSignIn(!!data.needsSignIn);
+        throw new Error(data.error ?? "Something went wrong");
+      }
       router.push(`/jobs/${data.jobId}`);
     } catch (err) {
       setError((err as Error).message);
@@ -70,10 +76,20 @@ export function ImportForm() {
       </label>
       <div className="mt-3 flex min-h-5 flex-wrap items-center justify-center gap-2 px-1 text-xs">
         {error ? (
-          <p role="alert" className="text-red-300">{error}</p>
+          <p role="alert" className="text-red-300">
+            {error}
+            {needsSignIn && (
+              <>
+                {" "}
+                <a href={SIGN_IN_URL} className="text-violet-300 underline-offset-4 hover:underline">
+                  Sign in with GitHub
+                </a>
+              </>
+            )}
+          </p>
         ) : (
           <p className="text-muted">
-            Already deployed? Add the live URL and we&apos;ll film that instead of running your code ·{" "}
+            Public or private repos (sign in) · Deployed? Add the live URL and we&apos;ll film that instead of running your code ·{" "}
             <button type="button" onClick={() => setUrl(EXAMPLE)} className="text-violet-300 underline-offset-4 hover:underline">
               Try an example
             </button>

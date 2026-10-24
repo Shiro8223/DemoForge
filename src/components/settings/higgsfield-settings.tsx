@@ -72,7 +72,7 @@ export function HiggsfieldSettings({ maxScenes, children }: { maxScenes: number;
                 <Sparkles className="size-[18px]" />
               </span>
               <div>
-                <h2 className="text-base font-semibold tracking-tight">Higgsfield MCP</h2>
+                <h2 className="text-xl">Higgsfield MCP</h2>
                 <p className="mt-0.5 text-[13px] text-muted">Cinematic scene generation</p>
               </div>
             </div>
@@ -173,7 +173,7 @@ export function HiggsfieldSettings({ maxScenes, children }: { maxScenes: number;
       <section id="danger" className="card-inset scroll-mt-20 rounded-2xl border border-red-500/20 bg-panel/80 p-5">
         <div className="flex items-center gap-2">
           <TriangleAlert className="size-4 text-red-300" />
-          <h2 className="text-base font-semibold tracking-tight text-red-200">Danger zone</h2>
+          <h2 className="text-xl text-red-200">Danger zone</h2>
         </div>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           Removing the Higgsfield key falls back to local motion-graphics title cards for cinematic scenes.
