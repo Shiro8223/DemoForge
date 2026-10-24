@@ -98,8 +98,8 @@ export async function cloneRepository(parsed: ParsedRepo, workspace: string): Pr
     throw new Error("Workspace escaped the workspace root");
   await fs.mkdir(workspace, { recursive: true });
 
-  const git = simpleGit({ timeout: { block: config.limits.cloneTimeoutMs } }).env({
-    // Never let git prompt for credentials or read the host's git config/credential helpers.
+  // Never let git prompt for credentials or read the host's git config/credential helpers.
+  const env: Record<string, string> = {
     PATH: process.env.PATH ?? "",
     HOME: workspace,
     GIT_TERMINAL_PROMPT: "0",
@@ -108,7 +108,14 @@ export async function cloneRepository(parsed: ParsedRepo, workspace: string): Pr
     ...(process.env.HTTPS_PROXY ? { HTTPS_PROXY: process.env.HTTPS_PROXY } : {}),
     ...(process.env.https_proxy ? { https_proxy: process.env.https_proxy } : {}),
     ...(process.env.GIT_SSL_CAINFO ? { GIT_SSL_CAINFO: process.env.GIT_SSL_CAINFO } : {}),
-  });
+  };
+  // simple-git blocks custom env vars and core.hooksPath by default; both are ours and
+  // only tighten git (hooksPath is set to disable hooks, see below).
+  const git = simpleGit({
+    timeout: { block: config.limits.cloneTimeoutMs },
+    allowEnvironment: Object.keys(env),
+    unsafe: { allowUnsafeHooksPath: true },
+  }).env(env);
   // core.symlinks=false: symlinks are checked out as plain files, so nothing we
   // later read for analysis can point outside the workspace.
   await git.clone(parsed.cloneUrl, target, [
