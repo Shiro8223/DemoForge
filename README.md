@@ -2,6 +2,8 @@
 
 **You built it. We'll make it impossible to ignore.**
 
+https://github.com/user-attachments/assets/e88bb7ea-4669-4621-be42-62bd48af867a
+
 DemoForge turns a public GitHub repository into a 20–30 second vertical (9:16) promo video. It launches the app, films the **real UI**, writes a grounded summary and storyboard, generates cinematic scenes with Higgsfield, and cuts the result together with FFmpeg.
 
 ```
